@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f10; --surface: #18181b; --surface2: #1f1f24;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --text: #f0efe9; --text2: rgba(255,255,255,0.6); --text3: rgba(255,255,255,0.4);
+    --accent: #e8c97e; --accent2: rgba(232,201,126,0.12); --accent3: rgba(232,201,126,0.06);
+    --green: #4ade80; --green-bg: rgba(74,222,128,0.08);
+    --red: #f87171; --red-bg: rgba(248,113,113,0.08);
+    --blue: #60a5fa; --blue-bg: rgba(96,165,250,0.08);
+    --purple: #a78bfa; --purple-bg: rgba(167,139,250,0.08);
+    --tag-bg: rgba(255,255,255,0.05);
+  }
+  body { font-family: 'Geist', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* NAV */
+  .topnav { height: 48px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; background: var(--surface); }
+  .logo { font-family: 'Instrument Serif', serif; font-size: 23px; color: var(--accent); flex-shrink: 0; }
+  .nav-sep { width: 1px; height: 16px; background: var(--border2); flex-shrink: 0; }
+  .project-pill { display: flex; align-items: center; gap: 5px; font-size: 17px; color: var(--text2); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; flex-shrink: 0; }
+  .project-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+  .search-wrap { flex: 1; max-width: 440px; margin: 0 auto; position: relative; }
+  .search-input-row { display: flex; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; height: 32px; transition: border-color 0.15s; }
+  .search-input-row:focus-within { border-color: var(--accent); }
+  .search-icon { font-size: 20px; color: var(--text3); margin-right: 6px; }
+  .search-input { flex: 1; background: transparent; border: none; outline: none; font-family: 'Geist', sans-serif; font-size: 18px; color: var(--text); }
+  .search-input::placeholder { color: var(--text3); }
+  .search-mode-toggle { display: flex; gap: 2px; margin-left: 6px; }
+  .mode-btn { font-size: 14px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text3); cursor: pointer; font-family: 'Geist', sans-serif; transition: all 0.15s; }
+  .mode-btn.active { background: var(--accent2); color: var(--accent); border-color: rgba(232,201,126,0.3); }
+  .search-dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; display: none; z-index: 100; max-height: 480px; overflow-y: auto; }
+  .search-dropdown.open { display: block; }
+  .sd-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 6px; border-bottom: 1px solid var(--border); }
+  .sd-title { font-size: 15px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; }
+  .ai-thinking { display: flex; align-items: center; gap: 4px; color: var(--accent); font-size: 15px; }
+  .ai-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+  .ai-dot:nth-child(2) { animation-delay: 0.2s; }
+  .ai-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+  .sd-section-label { font-size: 14px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 12px 4px; }
+  .sd-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; cursor: pointer; transition: background 0.1s; }
+  .sd-item:hover { background: var(--surface2); }
+  .sd-item-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .sd-item-icon.qa { background: var(--red-bg); }
+  .sd-item-icon.qa.resolved { background: var(--green-bg); }
+  .sd-item-icon.screen { background: var(--blue-bg); }
+  .sd-item-icon.decision { background: var(--accent2); }
+  .sd-item-body { flex: 1; min-width: 0; }
+  .sd-item-title { font-size: 18px; font-weight: 500; color: var(--text); line-height: 1.4; }
+  .sd-item-sub { font-size: 15px; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+  .sd-item-meta { display: flex; gap: 5px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+  .sd-badge { font-size: 14px; padding: 1px 5px; border-radius: 3px; }
+  .sd-badge.qa { background: var(--red-bg); color: var(--red); }
+  .sd-badge.qa-resolved { background: var(--green-bg); color: var(--green); }
+  .sd-badge.screen { background: var(--blue-bg); color: var(--blue); }
+  .sd-badge.decision { background: var(--accent2); color: var(--accent); }
+  .sd-badge.ai { background: var(--purple-bg); color: var(--purple); }
+  .sd-score { font-size: 14px; color: var(--text3); }
+  .sd-relevance { width: 32px; height: 3px; border-radius: 2px; background: var(--surface2); overflow: hidden; margin-top: 7px; flex-shrink: 0; }
+  .sd-relevance-bar { height: 100%; border-radius: 2px; background: var(--accent); }
+  .sd-ai-summary { margin: 6px 12px 8px; background: var(--accent3); border: 1px solid rgba(232,201,126,0.15); border-radius: 7px; padding: 10px 12px; }
+  .sd-ai-label { font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+  .sd-ai-text { font-size: 17px; color: var(--text2); line-height: 1.6; }
+  .sd-empty { padding: 20px; text-align: center; color: var(--text3); font-size: 18px; }
+  .sd-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent2); border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 500; color: var(--accent); }
+  .avatar.dim { opacity: 0.45; border-color: var(--border2); background: var(--surface2); color: var(--text3); }
+  .btn-new { height: 26px; padding: 0 10px; background: var(--accent); color: #1a1600; border: none; border-radius: 5px; font-family: 'Geist', sans-serif; font-size: 17px; font-weight: 500; cursor: pointer; }
+
+  /* MAIN */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar { width: 200px; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+  .sb-section { padding: 10px 12px 4px; font-size: 14px; font-weight: 500; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; }
+  .sb-item { display: flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 17px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
+  .sb-item:hover { background: var(--surface2); color: var(--text); }
+  .sb-item.active { background: var(--accent3); color: var(--accent); border-left-color: var(--accent); }
+  .sb-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.4; flex-shrink: 0; }
+  .sb-count { margin-left: auto; font-size: 14px; background: var(--tag-bg); border-radius: 8px; padding: 1px 5px; color: var(--text3); }
+  .sb-item.active .sb-count { background: var(--accent2); color: var(--accent); }
+  .sb-bottom { margin-top: auto; border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .link-label { font-size: 14px; color: var(--text3); margin-bottom: 3px; }
+  .link-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); outline: none; }
+  .link-input:focus { border-color: var(--accent); }
+  .link-input::placeholder { color: var(--text3); }
+  .load-btn { width: 100%; padding: 5px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 5px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); cursor: pointer; transition: all 0.15s; margin-top: 4px; }
+  .load-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* CENTER */
+  .center-col { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; min-width: 0; }
+  .panel-header { height: 38px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; gap: 7px; flex-shrink: 0; background: var(--surface); }
+  .panel-title { font-size: 15px; font-weight: 500; color: var(--text2); letter-spacing: 0.07em; text-transform: uppercase; }
+  .panel-badge { font-size: 15px; padding: 2px 6px; border-radius: 6px; background: var(--tag-bg); color: var(--text3); }
+  .panel-actions { margin-left: auto; display: flex; gap: 5px; align-items: center; }
+  .slack-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; padding: 2px 6px; border-radius: 6px; background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,0.2); }
+  .slack-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
+  .icon-btn { width: 24px; height: 24px; border-radius: 4px; background: transparent; border: 1px solid var(--border); color: var(--text3); cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; }
+  .figma-frame { flex: 1; background: var(--surface2); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .figma-frame::before { content:''; position:absolute; inset:0; background-image:linear-gradient(45deg,rgba(255,255,255,0.015) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,0.015) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,0.015) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,0.015) 75%); background-size:20px 20px; background-position:0 0,0 10px,10px -10px,-10px 0; }
+  .figma-ph { position:relative; z-index:1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .figma-icon-box { width:40px; height:40px; border-radius:10px; background:var(--surface); border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:27px; }
+  .figma-ph p { font-size:18px; color:var(--text2); }
+  .figma-ph span { font-size:15px; color:var(--text3); }
+  #figma-iframe { width:100%; height:100%; border:none; display:none; position:relative; z-index:1; }
+  .spec-panel { flex-shrink:0; border-top:1px solid var(--border); background:var(--surface); overflow:hidden; transition:height 0.28s ease; height:38px; }
+  .spec-panel.open { height:200px; }
+  .spec-header { height:38px; display:flex; align-items:center; padding:0 12px; gap:7px; cursor:pointer; }
+  .spec-toggle { margin-left:auto; font-size:15px; color:var(--text3); display:flex; align-items:center; gap:3px; }
+  .spec-toggle svg { transition:transform 0.28s; }
+  .spec-panel.open .spec-toggle svg { transform:rotate(180deg); }
+  .spec-panel.open .spec-toggle { color:var(--accent); }
+  .spec-body { height:162px; }
+  #spec-iframe { width:100%; height:100%; border:none; display:none; }
+  .spec-empty { display:flex; align-items:center; justify-content:center; height:100%; }
+  .spec-empty p { font-size:17px; color:var(--text3); }
+
+  /* RIGHT PANEL */
+  .right-panel { width: 340px; display: flex; flex-direction: column; background: var(--surface); flex-shrink: 0; overflow: hidden; }
+  .rp-tabs { height: 38px; border-bottom: 1px solid var(--border); display: flex; align-items: stretch; flex-shrink: 0; }
+  .rp-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 17px; font-weight: 500; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .rp-tab:hover { color: var(--text2); background: var(--surface2); }
+  .rp-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent3); }
+  .rp-tab-count { font-size: 14px; padding: 1px 5px; border-radius: 6px; background: var(--tag-bg); color: var(--text3); }
+  .rp-tab.active .rp-tab-count { background: var(--accent2); color: var(--accent); }
+  .screen-info-wrap { flex: 1; display: none; overflow: hidden; }
+  .screen-info-wrap.active { display: flex; flex-direction: column; overflow: hidden; }
+  .screen-info { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; }
+  .screen-info::-webkit-scrollbar { width: 3px; }
+  .screen-info::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .info-section { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 20px; }
+  .info-section:last-child { border-bottom: none; }
+  .info-label { font-size: 14px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); margin-bottom: 5px; }
+  .info-value { font-size: 15px; color: var(--text2); line-height: 1.6; }
+  .info-value.primary { font-size: 15px; color: var(--text); font-weight: 500; line-height: 1.5; }
+  .kpi-list { display: flex; flex-direction: column; gap: 4px; }
+  .kpi-item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; background: var(--surface2); border-radius: 5px; border: 1px solid var(--border); }
+  .kpi-name { font-size: 15px; color: var(--text2); flex: 1; }
+  .kpi-value { font-size: 15px; font-weight: 500; color: var(--accent); }
+  .kpi-trend { font-size: 15px; color: var(--green); }
+  .decision-list { display: flex; flex-direction: column; gap: 5px; }
+  .decision-item { background: var(--surface2); border-radius: 5px; padding: 7px 9px; border-left: 2px solid var(--accent); }
+  .decision-q { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .decision-why { font-size: 15px; color: var(--text3); line-height: 1.5; }
+  .decision-reconsider { font-size: 15px; color: var(--blue); background: var(--blue-bg); border: 1px solid rgba(96,165,250,0.2); border-radius: 5px; padding: 5px 9px; margin-top: 6px; line-height: 1.5; }
+  .reconsider-list { display: flex; flex-direction: column; gap: 3px; }
+  .reconsider-item { display: flex; align-items: flex-start; gap: 5px; font-size: 15px; color: var(--text2); line-height: 1.5; }
+  .reconsider-icon { color: var(--red); font-size: 15px; margin-top: 2px; flex-shrink: 0; }
+  .owner-list { display: flex; gap: 6px; flex-wrap: wrap; }
+  .owner-item { display: flex; align-items: center; gap: 5px; padding: 4px 7px; background: var(--surface2); border-radius: 5px; border: 1px solid var(--border); }
+  .owner-avatar { width: 18px; height: 18px; border-radius: 50%; background: var(--accent2); border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--accent); font-weight: 500; }
+  .owner-name { font-size: 15px; color: var(--text2); }
+  .owner-role { font-size: 15px; color: var(--text3); }
+  .history-list { display: flex; flex-direction: column; }
+  .history-item { display: flex; gap: 8px; padding: 4px 0; position: relative; }
+  .history-item::before { content:''; position:absolute; left:4px; top:14px; bottom:-4px; width:1px; background:var(--border); }
+  .history-item:last-child::before { display:none; }
+  .history-dot { width:9px; height:9px; border-radius:50%; background:var(--surface2); border:1px solid var(--border2); flex-shrink:0; margin-top:3px; }
+  .history-dot.latest { background:var(--accent2); border-color:var(--accent); }
+  .history-what { font-size:15px; color:var(--text2); line-height:1.4; }
+  .history-meta { font-size:15px; color:var(--text3); }
+  .figma-chips { display:flex; gap:5px; flex-wrap:wrap; }
+  .figma-chip { display:flex; align-items:center; gap:4px; padding:3px 7px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; font-size:15px; color:var(--text2); cursor:pointer; }
+  .figma-chip:hover { border-color:var(--accent); color:var(--accent); }
+  .figma-chip-dot { width:5px; height:5px; border-radius:1px; background:var(--purple); }
+  .qa-body { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+  .qa-body.active { display: flex; }
+  .qa-sub-tabs { display: flex; gap: 2px; padding: 7px 9px 0; flex-shrink: 0; }
+  .qa-sub-tab { font-size: 15px; padding: 2px 7px; border-radius: 4px; color: var(--text3); cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .qa-sub-tab.active { background: var(--accent2); color: var(--accent); border-color: rgba(232,201,126,0.2); }
+  .qa-list { flex: 1; overflow-y: auto; padding: 7px 9px; display: flex; flex-direction: column; gap: 5px; }
+  .qa-list::-webkit-scrollbar { width: 3px; }
+  .qa-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .qa-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 9px; cursor: pointer; transition: all 0.15s; }
+  .qa-card:hover { border-color: var(--border2); }
+  .qa-card.active { border-color: var(--accent); background: var(--accent3); }
+  .qa-card-top { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+  .qa-status { width: 14px; height: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+  .qa-status.resolved { background: var(--green-bg); color: var(--green); }
+  .qa-status.open { background: var(--red-bg); color: var(--red); }
+  .qa-q { font-size: 17px; font-weight: 500; color: var(--text); line-height: 1.4; flex: 1; }
+  .qa-meta { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .qa-tag { font-size: 14px; padding: 1px 4px; border-radius: 3px; background: var(--tag-bg); color: var(--text3); border: 1px solid var(--border); }
+  .qa-time { font-size: 14px; color: var(--text3); margin-left: auto; }
+  .src-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 14px; padding: 1px 4px; border-radius: 3px; }
+  .src-slack { background: var(--green-bg); color: var(--green); }
+  .src-figma { background: var(--purple-bg); color: var(--purple); }
+  .qa-detail { border-top: 1px solid var(--border); padding: 10px; display: none; flex-direction: column; gap: 7px; max-height: 200px; overflow-y: auto; background: var(--bg); flex-shrink: 0; }
+  .qa-detail.open { display: flex; }
+  .detail-q { font-size: 17px; font-weight: 500; color: var(--text); line-height: 1.5; }
+  .detail-al { font-size: 14px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .detail-a { font-size: 15px; color: var(--text2); line-height: 1.6; background: var(--surface2); border-radius: 5px; padding: 7px 9px; border: 1px solid var(--border); }
+  .detail-actions { display: flex; gap: 5px; }
+  .det-btn { flex: 1; padding: 5px 0; font-size: 15px; font-family: 'Geist', sans-serif; border-radius: 5px; cursor: pointer; font-weight: 500; }
+  .det-btn.primary { background: var(--accent); color: #1a1600; border: none; }
+  .det-btn.secondary { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .qa-compose { border-top: 1px solid var(--border); padding: 8px 9px; display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+  .compose-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; font-family: 'Geist', sans-serif; font-size: 17px; color: var(--text); outline: none; resize: none; min-height: 46px; transition: border-color 0.15s; }
+  .compose-input:focus { border-color: var(--accent); }
+  .compose-input::placeholder { color: var(--text3); }
+  .compose-row { display: flex; gap: 4px; }
+  .compose-select { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 5px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); outline: none; }
+  .submit-btn { padding: 4px 10px; background: var(--accent); border: none; border-radius: 4px; font-family: 'Geist', sans-serif; font-size: 15px; font-weight: 500; color: #1a1600; cursor: pointer; flex-shrink: 0; }
+
+  /* ADD SCREEN BUTTON */
+  .sb-add-btn { display: flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 15px; color: var(--text3); cursor: pointer; border: none; background: transparent; width: 100%; text-align: left; font-family: 'Geist', sans-serif; transition: all 0.1s; }
+  .sb-add-btn:hover { color: var(--accent); background: var(--accent3); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; width: 560px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-title { font-size: 17px; font-weight: 500; color: var(--text); }
+  .modal-close { background: transparent; border: none; color: var(--text3); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .modal-body::-webkit-scrollbar { width: 3px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+  .mf-label { font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .mf-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .mf-input:focus { border-color: var(--accent); }
+  .mf-input::placeholder { color: var(--text3); }
+  .mf-textarea { resize: vertical; min-height: 64px; }
+  .mf-dynamic { display: flex; flex-direction: column; gap: 6px; }
+  .mf-row { display: flex; gap: 6px; align-items: flex-start; }
+  .mf-row .mf-input { flex: 1; }
+  .mf-remove { background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text3); font-size: 15px; padding: 0 8px; height: 36px; cursor: pointer; flex-shrink: 0; transition: all 0.1s; }
+  .mf-remove:hover { border-color: var(--red); color: var(--red); }
+  .mf-add { background: transparent; border: 1px dashed var(--border2); border-radius: 5px; color: var(--text3); font-size: 14px; padding: 5px 10px; cursor: pointer; font-family: 'Geist', sans-serif; transition: all 0.1s; text-align: left; }
+  .mf-add:hover { border-color: var(--accent); color: var(--accent); }
+  .modal-btn { padding: 7px 18px; border-radius: 6px; font-family: 'Geist', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; }
+  .modal-btn.primary { background: var(--accent); color: #1a1600; border: none; }
+  .modal-btn.secondary { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+
+  /* RIGHT PANEL INLINE EDIT */
+  .rp-save-bar { padding: 8px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .rp-field-section { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px; }
+  .rp-field-section:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="logo">Decision Tracker</div>
+  <div class="nav-sep"></div>
+  <div class="project-pill"><div class="project-dot"></div>somesay</div>
+  <div class="search-wrap" id="search-wrap">
+    <div class="search-input-row">
+      <span class="search-icon">⌕</span>
+      <input class="search-input" id="search-input" placeholder="화면, Q&A, 결정사항 검색..." autocomplete="off">
+      <div class="search-mode-toggle">
+        <button class="mode-btn active" id="mode-keyword" onclick="setMode('keyword')">키워드</button>
+        <button class="mode-btn" id="mode-ai" onclick="setMode('ai')">AI</button>
+      </div>
+    </div>
+    <div class="search-dropdown" id="search-dropdown"></div>
+  </div>
+  <div class="nav-right">
+    <div class="avatar">지</div>
+    <div class="avatar dim">민</div>
+    <div class="avatar dim">서</div>
+    <button class="btn-new">+ 질문 등록</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sb-section">화면</div>
+    <div id="sb-screens"></div>
+    <button class="sb-add-btn" onclick="openScreenModal()">＋ 화면 추가</button>
+    <div class="sb-section" style="margin-top:6px">상태</div>
+    <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot"></div>전체<span class="sb-count">0</span></div>
+    <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot" style="background:var(--red)"></div>미해결<span class="sb-count">0</span></div>
+    <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot" style="background:var(--green)"></div>해결됨<span class="sb-count">0</span></div>
+    <div class="sb-bottom">
+      <div>
+        <div class="link-label">피그마 링크</div>
+        <input class="link-input" id="figma-url" placeholder="https://figma.com/...">
+        <button class="load-btn" onclick="loadFigma()">피그마 열기</button>
+      </div>
+      <div>
+        <div class="link-label">명세서 (구글 시트)</div>
+        <input class="link-input" id="spec-url" placeholder="https://docs.google.com/...">
+        <button class="load-btn" onclick="loadSpec()">명세서 열기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="center-col">
+    <div class="panel-header">
+      <div class="panel-title">미리보기</div>
+      <div class="panel-badge" id="screen-badge"></div>
+      <div class="panel-actions">
+        <div class="slack-badge"><div class="slack-dot"></div>슬랙 연동 중</div>
+        <button class="icon-btn" onclick="openFigma()">↗</button>
+      </div>
+    </div>
+    <div class="figma-frame">
+      <iframe id="figma-iframe"></iframe>
+      <div class="figma-ph" id="figma-ph">
+        <div class="figma-icon-box">◈</div>
+        <p>피그마 와이어프레임</p>
+        <span>좌측 하단에 링크를 입력하세요</span>
+      </div>
+    </div>
+    <div class="spec-panel" id="spec-panel">
+      <div class="spec-header" onclick="toggleSpec()">
+        <div class="panel-title">기능명세서</div>
+        <div class="panel-badge">구글 스프레드시트</div>
+        <div class="spec-toggle" id="spec-toggle">
+          <span id="spec-lbl">펼치기</span>
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="spec-body">
+        <iframe id="spec-iframe"></iframe>
+        <div class="spec-empty" id="spec-empty"><p>구글 시트 링크를 입력하면 여기에 표시돼요</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="rp-tabs">
+      <div class="rp-tab active" id="tab-info" onclick="switchRpTab('info')">화면 정보</div>
+      <div class="rp-tab" id="tab-qa" onclick="switchRpTab('qa')">Q&A <span class="rp-tab-count" id="qa-count">3</span></div>
+    </div>
+    <div class="screen-info-wrap active" id="pane-info">
+      <div class="screen-info" id="screen-info-content"></div>
+      <div class="rp-save-bar" id="rp-save-bar" style="display:none;">
+        <div id="rp-bar-view">
+          <button class="modal-btn secondary" style="width:100%;padding:8px 0;font-size:15px;" onclick="activateInfoEdit()">수정</button>
+        </div>
+        <div id="rp-bar-edit" style="display:none;gap:6px;display:none;">
+          <button class="modal-btn secondary" style="flex:1;padding:8px 0;font-size:15px;" onclick="cancelInfoEdit()">취소</button>
+          <button class="modal-btn primary" style="flex:1;padding:8px 0;font-size:15px;" onclick="saveScreenFromPanel()">저장</button>
+        </div>
+      </div>
+    </div>
+    <div class="qa-body" id="pane-qa">
+      <div class="qa-sub-tabs">
+        <div class="qa-sub-tab active" onclick="switchQaTab('all',this)">전체</div>
+        <div class="qa-sub-tab" onclick="switchQaTab('open',this)">미해결</div>
+        <div class="qa-sub-tab" onclick="switchQaTab('resolved',this)">해결됨</div>
+      </div>
+      <div class="qa-list" id="qa-list"></div>
+      <div class="qa-detail" id="qa-detail">
+        <div class="detail-q" id="detail-q"></div>
+        <div class="detail-al">답변</div>
+        <div class="detail-a" id="detail-a"></div>
+        <div class="detail-actions">
+          <button class="det-btn primary">✓ 해결됨</button>
+          <button class="det-btn secondary" onclick="closeDetail()">닫기</button>
+        </div>
+      </div>
+      <div class="qa-compose">
+        <textarea class="compose-input" id="compose-q" placeholder="이 화면에 대해 궁금한 점을 적어주세요..." rows="2"></textarea>
+        <div class="compose-row">
+          <select class="compose-select"><option>태그</option><option>UX</option><option>개발</option><option>기획</option></select>
+          <select class="compose-select"><option>슬랙</option><option>피그마</option><option>직접입력</option></select>
+          <button class="submit-btn" onclick="submitQ()">등록</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 화면 추가/수정 모달 -->
+<div class="modal-overlay" id="screen-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">화면 추가</div>
+      <button class="modal-close" onclick="closeScreenModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="mf-label">화면 이름</div>
+        <input class="mf-input" id="mf-name" placeholder="예: 로그인 · 온보딩">
+      </div>
+      <div>
+        <div class="mf-label">화면 목적</div>
+        <textarea class="mf-input mf-textarea" id="mf-purpose" placeholder="이 화면의 목적과 목표를 입력하세요"></textarea>
+      </div>
+      <div>
+        <div class="mf-label">핵심 KPI</div>
+        <div class="mf-dynamic" id="mf-kpis"></div>
+        <button class="mf-add" onclick="addKpiRow()">＋ KPI 추가</button>
+      </div>
+      <div>
+        <div class="mf-label">결정사항</div>
+        <div class="mf-dynamic" id="mf-decisions"></div>
+        <button class="mf-add" onclick="addDecisionRow()">＋ 결정사항 추가</button>
+      </div>
+      <div>
+        <div class="mf-label">피그마 프레임</div>
+        <div class="mf-dynamic" id="mf-frames"></div>
+        <button class="mf-add" onclick="addFrameRow()">＋ 프레임 추가</button>
+      </div>
+      <div>
+        <div class="mf-label">담당자</div>
+        <div class="mf-dynamic" id="mf-owners"></div>
+        <button class="mf-add" onclick="addOwnerRow()">＋ 담당자 추가</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn secondary" onclick="closeScreenModal()">취소</button>
+      <button class="modal-btn primary" onclick="saveScreen()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GEMINI_API_KEY = 'AIzaSyCcYUH6hluJ5zhsBZMKJh_Y94GhwtRkobs'
+
+const GEMINI_MODEL = 'gemini-2.5-flash'
+
+const screens = {};
+
+const qaData = {};
+
+function buildIndex() {
+  const items = [];
+  Object.entries(screens).forEach(([key, s]) => {
+    items.push({type:'screen',screenKey:key,title:s.name,body:s.purpose,sub:'화면 목적'});
+    s.decisions.forEach(d => items.push({type:'decision',screenKey:key,title:d.q,body:d.why,sub:s.name+' · 결정사항'}));
+    s.kpis.forEach(k => items.push({type:'screen',screenKey:key,title:k.name,body:k.value+' '+k.trend,sub:s.name+' · KPI'}));
+    s.reconsider.forEach(r => items.push({type:'screen',screenKey:key,title:r,body:'',sub:s.name+' · 재논의조건'}));
+  });
+  Object.entries(qaData).forEach(([key, qas]) => {
+    qas.forEach(q => items.push({type:'qa',screenKey:key,qaId:q.id,title:q.q,body:q.a||'',status:q.status,source:q.source,sub:screens[key]?.name+' · Q&A'}));
+  });
+  return items;
+}
+const searchIndex = buildIndex();
+
+let searchMode='keyword', searchTimer=null, currentScreen=null, currentRpTab='info', currentQaTab='all', activeQaCard=null, specOpen=false, aiController=null;
+
+function setMode(mode) {
+  searchMode = mode;
+  document.getElementById('mode-keyword').classList.toggle('active', mode==='keyword');
+  document.getElementById('mode-ai').classList.toggle('active', mode==='ai');
+  const q = document.getElementById('search-input').value.trim();
+  if (q) doSearch(q);
+}
+
+document.getElementById('search-input').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (!q) { closeDropdown(); return; }
+  searchTimer = setTimeout(() => doSearch(q), searchMode==='ai' ? 600 : 200);
+});
+document.getElementById('search-input').addEventListener('focus', e => { if (e.target.value.trim()) doSearch(e.target.value.trim()); });
+document.addEventListener('click', e => { if (!document.getElementById('search-wrap').contains(e.target)) closeDropdown(); });
+document.addEventListener('keydown', e => { if ((e.metaKey||e.ctrlKey) && e.key==='k') { e.preventDefault(); document.getElementById('search-input').focus(); } });
+
+function closeDropdown() { const d=document.getElementById('search-dropdown'); d.classList.remove('open'); d.innerHTML=''; }
+function doSearch(q) { searchMode==='keyword' ? doKeywordSearch(q) : doAISearch(q); }
+
+function doKeywordSearch(query) {
+  const q = query.toLowerCase();
+  const results = searchIndex.filter(i => i.title.toLowerCase().includes(q) || i.body.toLowerCase().includes(q) || i.sub.toLowerCase().includes(q)).slice(0,8);
+  renderResults(results, query, null, false);
+}
+
+async function doAISearch(query) {
+  if (aiController) aiController.abort();
+  aiController = new AbortController();
+  const kwResults = searchIndex.filter(i => { const q=query.toLowerCase(); return i.title.toLowerCase().includes(q)||i.body.toLowerCase().includes(q); }).slice(0,5);
+  renderResults(kwResults, query, null, true);
+  const context = searchIndex.map((item,i) => `[${i}] type:${item.type} screen:${item.sub} title:"${item.title}" body:"${item.body}"`).join('\n');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', signal:aiController.signal,
+      headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000,
+        system:`당신은 프로덕트 팀의 Q&A 검색 도우미입니다. 다음 형식의 JSON만 반환하세요:\n{"summary":"2줄 이내 요약","matches":[{"index":숫자,"score":0~100,"reason":"관련 이유 한 줄"}]}\n최대 6개, score 높은 순.`,
+        messages:[{role:'user',content:`쿼리: "${query}"\n\n데이터:\n${context}`}] })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    let parsed; try { parsed = JSON.parse(text); } catch { parsed = null; }
+    if (parsed?.matches) {
+      const aiResults = parsed.matches.filter(m=>m.index>=0&&m.index<searchIndex.length).map(m=>({...searchIndex[m.index],score:m.score,aiReason:m.reason}));
+      renderResults(aiResults, query, parsed.summary, false);
+    }
+  } catch(e) { if (e.name!=='AbortError') renderResults(kwResults, query, null, false); }
+}
+
+function renderResults(results, query, aiSummary, thinking) {
+  const dd = document.getElementById('search-dropdown');
+  dd.classList.add('open');
+  const hl = (text, q) => { if (!q||!text) return text||''; const re=new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'); return text.replace(re,'<mark style="background:var(--accent2);color:var(--accent);border-radius:2px;padding:0 1px">$1</mark>'); };
+  let html = `<div class="sd-header"><span class="sd-title">${results.length}개 결과</span><span>${thinking?`<span class="ai-thinking"><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span>AI 분석 중</span>`:`<span style="font-size:15px;color:var(--text3)">${searchMode==='ai'?'AI 시맨틱':'키워드'} 검색</span>`}</span></div>`;
+  if (aiSummary) html += `<div class="sd-ai-summary"><div class="sd-ai-label">✦ AI 요약</div><div class="sd-ai-text">${aiSummary}</div></div>`;
+  if (!results.length) { html += `<div class="sd-empty">관련 결과를 찾지 못했어요</div>`; }
+  else {
+    const infoItems = results.filter(r=>r.type!=='qa'), qaItems = results.filter(r=>r.type==='qa');
+    if (infoItems.length) { html += `<div class="sd-section-label">화면 정보</div>`; infoItems.forEach(item => { html += `<div class="sd-item" onclick="navigateTo('${item.screenKey}','info')"><div class="sd-item-icon screen">◉</div><div class="sd-item-body"><div class="sd-item-title">${hl(item.title,query)}</div>${item.body?`<div class="sd-item-sub">${hl(item.body,query)}</div>`:''}<div class="sd-item-meta"><span class="sd-badge ${item.type==='decision'?'decision':'screen'}">${item.type==='decision'?'결정사항':item.sub.includes('KPI')?'KPI':item.sub.includes('재논의')?'재논의':'화면정보'}</span><span class="sd-score">${item.sub}</span>${item.aiReason?`<span class="sd-badge ai">${item.aiReason}</span>`:''}</div></div>${item.score?`<div class="sd-relevance"><div class="sd-relevance-bar" style="width:${item.score}%"></div></div>`:''}</div>`; }); }
+    if (qaItems.length) { if (infoItems.length) html+=`<div class="sd-divider"></div>`; html += `<div class="sd-section-label">Q&A</div>`; qaItems.forEach(item => { html += `<div class="sd-item" onclick="navigateTo('${item.screenKey}','qa',${item.qaId})"><div class="sd-item-icon qa ${item.status}">${item.status==='resolved'?'✓':'!'}</div><div class="sd-item-body"><div class="sd-item-title">${hl(item.title,query)}</div>${item.body?`<div class="sd-item-sub">${hl(item.body,query)}</div>`:''}<div class="sd-item-meta"><span class="sd-badge ${item.status==='resolved'?'qa-resolved':'qa'}">${item.status==='resolved'?'해결됨':'미해결'}</span><span class="sd-score">${item.sub}</span>${item.aiReason?`<span class="sd-badge ai">${item.aiReason}</span>`:''}</div></div>${item.score?`<div class="sd-relevance"><div class="sd-relevance-bar" style="width:${item.score}%"></div></div>`:''}</div>`; }); }
+  }
+  dd.innerHTML = html;
+}
+
+function navigateTo(screenKey, tab, qaId) {
+  closeDropdown(); document.getElementById('search-input').value='';
+  const keys=['login','dashboard','product','payment','mypage'], idx=keys.indexOf(screenKey);
+  const sbItems=document.querySelectorAll('.sb-item');
+  if (idx>=0) { sbItems.forEach(i=>i.classList.remove('active')); sbItems[idx].classList.add('active'); }
+  currentScreen=screenKey; document.getElementById('screen-badge').textContent=screens[screenKey]?.name||'';
+  renderScreenInfo(screenKey); renderQaList(currentQaTab); switchRpTab(tab);
+  if (qaId) setTimeout(()=>showDetail(qaId),100);
+}
+
+function renderScreenInfo(key) {
+  const el = document.getElementById('screen-info-content');
+  const saveBar = document.getElementById('rp-save-bar');
+  if (!key || !screens[key]) { el.innerHTML = ''; saveBar.style.display = 'none'; return; }
+  const s = screens[key];
+  el.innerHTML = `
+    <div class="info-section"><div class="info-label">화면 목적</div><div class="info-value primary">${s.purpose||''}</div></div>
+    <div class="info-section"><div class="info-label">핵심 KPI</div><div class="kpi-list">${(s.kpis||[]).map(k=>`<div class="kpi-item"><div class="kpi-name">${k.name}</div><div class="kpi-value">${k.value}</div><div class="kpi-trend">${k.trend}</div></div>`).join('')}</div></div>
+    <div class="info-section"><div class="info-label">결정사항</div><div class="decision-list">${(s.decisions||[]).map(d=>`<div class="decision-item"><div class="decision-q">${d.q}</div><div class="decision-why">${d.why}</div>${d.reconsider?`<div class="decision-reconsider">재논의 조건: ${d.reconsider}</div>`:''}</div>`).join('')}</div></div>
+    <div class="info-section"><div class="info-label">피그마 프레임</div><div class="figma-chips">${(s.figmaFrames||[]).map(f=>`<div class="figma-chip"><div class="figma-chip-dot"></div>${f}</div>`).join('')}</div></div>
+    <div class="info-section"><div class="info-label">담당자</div><div class="owner-list">${(s.owners||[]).map(o=>`<div class="owner-item"><div class="owner-avatar">${o.name?o.name[0]:''}</div><div><div class="owner-name">${o.name}</div><div class="owner-role">${o.role}</div></div></div>`).join('')}</div></div>`;
+  saveBar.style.display = 'block';
+  document.getElementById('rp-bar-view').style.display = 'block';
+  document.getElementById('rp-bar-edit').style.display = 'none';
+}
+
+function activateInfoEdit() {
+  const s = screens[currentScreen];
+  const el = document.getElementById('screen-info-content');
+  el.innerHTML = `
+    <div class="rp-field-section">
+      <div class="info-label">화면 이름</div>
+      <input class="mf-input" id="rp-name" value="${s.name||''}" placeholder="화면 이름">
+    </div>
+    <div class="rp-field-section">
+      <div class="info-label">화면 목적</div>
+      <textarea class="mf-input mf-textarea" id="rp-purpose" placeholder="화면의 목적과 목표">${s.purpose||''}</textarea>
+    </div>
+    <div class="rp-field-section">
+      <div class="info-label">핵심 KPI</div>
+      <div class="mf-dynamic" id="rp-kpis"></div>
+      <button class="mf-add" onclick="rpAddKpiRow()">＋ KPI 추가</button>
+    </div>
+    <div class="rp-field-section">
+      <div class="info-label">결정사항</div>
+      <div class="mf-dynamic" id="rp-decisions"></div>
+      <button class="mf-add" onclick="rpAddDecisionRow()">＋ 결정사항 추가</button>
+    </div>
+    <div class="rp-field-section">
+      <div class="info-label">피그마 프레임</div>
+      <div class="mf-dynamic" id="rp-frames"></div>
+      <button class="mf-add" onclick="rpAddFrameRow()">＋ 프레임 추가</button>
+    </div>
+    <div class="rp-field-section">
+      <div class="info-label">담당자</div>
+      <div class="mf-dynamic" id="rp-owners"></div>
+      <button class="mf-add" onclick="rpAddOwnerRow()">＋ 담당자 추가</button>
+    </div>`;
+  (s.kpis||[]).forEach(k=>rpAddKpiRow(k.name,k.value,k.trend));
+  (s.decisions||[]).forEach(d=>rpAddDecisionRow(d.q,d.why,d.reconsider||''));
+  (s.figmaFrames||[]).forEach(f=>rpAddFrameRow(f));
+  (s.owners||[]).forEach(o=>rpAddOwnerRow(o.name,o.role));
+  document.getElementById('rp-bar-view').style.display = 'none';
+  document.getElementById('rp-bar-edit').style.display = 'flex';
+}
+
+function cancelInfoEdit() {
+  renderScreenInfo(currentScreen);
+}
+
+function renderQaList(tab) {
+  const items = (qaData[currentScreen]||[]).filter(d=>tab==='all'||d.status===tab);
+  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail(${d.id})"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${d.q}</div></div><div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':'피그마'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
+  document.getElementById('qa-count').textContent = (qaData[currentScreen]||[]).length;
+}
+
+function showDetail(id) { const all=Object.values(qaData).flat(), d=all.find(x=>x.id===id); if(!d) return; activeQaCard=id; document.getElementById('detail-q').textContent=d.q; document.getElementById('detail-a').textContent=d.a||'아직 답변이 없습니다.'; document.getElementById('qa-detail').classList.add('open'); renderQaList(currentQaTab); }
+function closeDetail() { activeQaCard=null; document.getElementById('qa-detail').classList.remove('open'); renderQaList(currentQaTab); }
+function switchRpTab(tab) { currentRpTab=tab; ['info','qa'].forEach(t=>{document.getElementById(`tab-${t}`).classList.toggle('active',t===tab); document.getElementById(`pane-${t}`)?.classList.toggle('active',t===tab);}); }
+function switchQaTab(tab,el) { currentQaTab=tab; document.querySelectorAll('.qa-sub-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); closeDetail(); renderQaList(tab); }
+function selectScreen(el,key) { currentScreen=key; document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); document.getElementById('screen-badge').textContent=screens[key].name; closeDetail(); renderScreenInfo(key); renderQaList(currentQaTab); }
+function activateSb(el) { document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); }
+function loadFigma() { const u=document.getElementById('figma-url').value.trim(); if(!u) return; const f=document.getElementById('figma-iframe'); f.src='https://www.figma.com/embed?embed_host=share&url='+encodeURIComponent(u); f.style.display='block'; document.getElementById('figma-ph').style.display='none'; }
+function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
+function loadSpec() { const u=document.getElementById('spec-url').value.trim(); if(!u) return; const f=document.getElementById('spec-iframe'); f.src=u.includes('/edit')?u.replace('/edit','')+'/preview':u; f.style.display='block'; document.getElementById('spec-empty').style.display='none'; if(!specOpen) toggleSpec(); }
+function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
+function submitQ() { const q=document.getElementById('compose-q').value.trim(); if(!q) return; if(!qaData[currentScreen]) qaData[currentScreen]=[]; qaData[currentScreen].unshift({id:Date.now(),q,a:'',status:'open',tags:['기타'],source:'manual',time:'방금'}); document.getElementById('compose-q').value=''; renderQaList(currentQaTab); switchRpTab('qa'); }
+
+// 사이드바 화면 목록 렌더링
+function renderSidebarScreens() {
+  const container = document.getElementById('sb-screens');
+  container.innerHTML = Object.entries(screens).map(([key, s]) =>
+    `<div class="sb-item${currentScreen===key?' active':''}" onclick="selectScreen(this,'${key}')">
+      <div class="sb-dot"></div>${s.name}
+      <span class="sb-count">${(qaData[key]||[]).length}</span>
+      <span onclick="event.stopPropagation();openScreenModal('${key}')" style="margin-left:4px;font-size:12px;color:var(--text3);cursor:pointer;opacity:0.7" title="편집">✎</span>
+    </div>`
+  ).join('');
+}
+
+// 모달 열기 (key 있으면 편집 모드)
+let editingKey = null;
+function openScreenModal(key) {
+  editingKey = key || null;
+  document.getElementById('modal-title').textContent = key ? '화면 편집' : '화면 추가';
+  const s = key ? screens[key] : null;
+  document.getElementById('mf-name').value = s ? s.name : '';
+  document.getElementById('mf-purpose').value = s ? s.purpose : '';
+  document.getElementById('mf-kpis').innerHTML = '';
+  document.getElementById('mf-decisions').innerHTML = '';
+  document.getElementById('mf-frames').innerHTML = '';
+  document.getElementById('mf-owners').innerHTML = '';
+  (s?.kpis||[]).forEach(k => addKpiRow(k.name, k.value, k.trend));
+  (s?.decisions||[]).forEach(d => addDecisionRow(d.q, d.why, d.reconsider||''));
+  (s?.figmaFrames||[]).forEach(f => addFrameRow(f));
+  (s?.owners||[]).forEach(o => addOwnerRow(o.name, o.role));
+  document.getElementById('screen-modal').classList.add('open');
+}
+function closeScreenModal() {
+  document.getElementById('screen-modal').classList.remove('open');
+  editingKey = null;
+}
+document.getElementById('screen-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeScreenModal(); });
+
+// 동적 행 추가 함수
+function addKpiRow(name='', value='', trend='') {
+  const row = document.createElement('div'); row.className = 'mf-row';
+  row.innerHTML = `<input class="mf-input" placeholder="지표명" value="${name}"><input class="mf-input" placeholder="목표값" value="${value}"><input class="mf-input" placeholder="트렌드 (예: ↑ 54%)" value="${trend}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('mf-kpis').appendChild(row);
+}
+function addDecisionRow(q='', why='', reconsider='') {
+  const row = document.createElement('div'); row.className = 'mf-row'; row.style.cssText='flex-direction:column;gap:5px;position:relative';
+  row.innerHTML = `<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><textarea class="mf-input" placeholder="결정 내용" style="min-height:60px;resize:none;width:100%">${q}</textarea><textarea class="mf-input" placeholder="이유" style="min-height:60px;resize:none;width:100%">${why}</textarea><textarea class="mf-input" placeholder="재논의 조건 (선택)" style="min-height:60px;resize:none;width:100%">${reconsider}</textarea>`;
+  document.getElementById('mf-decisions').appendChild(row);
+}
+function addFrameRow(val='') {
+  const row = document.createElement('div'); row.className = 'mf-row';
+  row.innerHTML = `<input class="mf-input" placeholder="피그마 프레임명" value="${val}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('mf-frames').appendChild(row);
+}
+function addOwnerRow(name='', role='') {
+  const row = document.createElement('div'); row.className = 'mf-row';
+  row.innerHTML = `<input class="mf-input" placeholder="이름" value="${name}"><input class="mf-input" placeholder="팀" value="${role}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('mf-owners').appendChild(row);
+}
+
+// 저장
+function saveScreen() {
+  const name = document.getElementById('mf-name').value.trim();
+  if (!name) { document.getElementById('mf-name').focus(); return; }
+  const key = editingKey || 'screen_' + Date.now();
+  const kpiRows = document.getElementById('mf-kpis').querySelectorAll('.mf-row');
+  const decRows = document.getElementById('mf-decisions').querySelectorAll('.mf-row');
+  const frmRows = document.getElementById('mf-frames').querySelectorAll('.mf-row');
+  const ownRows = document.getElementById('mf-owners').querySelectorAll('.mf-row');
+  screens[key] = {
+    name,
+    purpose: document.getElementById('mf-purpose').value.trim(),
+    kpis: [...kpiRows].map(r => { const i=r.querySelectorAll('input'); return {name:i[0].value.trim(),value:i[1].value.trim(),trend:i[2].value.trim()}; }).filter(k=>k.name),
+    decisions: [...decRows].map(r => { const t=r.querySelectorAll('textarea'); return {q:t[0].value.trim(),why:t[1].value.trim(),reconsider:t[2]?t[2].value.trim():''}; }).filter(d=>d.q),
+    figmaFrames: [...frmRows].map(r => r.querySelector('input').value.trim()).filter(Boolean),
+    history: screens[key]?.history || [],
+    owners: [...ownRows].map(r => { const i=r.querySelectorAll('input'); return {name:i[0].value.trim(),role:i[1].value.trim()}; }).filter(o=>o.name),
+  };
+  if (!editingKey) currentScreen = key;
+  closeScreenModal();
+  renderSidebarScreens();
+  document.getElementById('screen-badge').textContent = screens[key].name;
+  renderScreenInfo(key);
+  renderQaList(currentQaTab);
+}
+
+// 우측 패널 저장
+function saveScreenFromPanel() {
+  const name = document.getElementById('rp-name').value.trim();
+  if (!name) { document.getElementById('rp-name').focus(); return; }
+  screens[currentScreen] = {
+    ...screens[currentScreen],
+    name,
+    purpose: document.getElementById('rp-purpose').value.trim(),
+    kpis: [...document.getElementById('rp-kpis').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),value:i[1].value.trim(),trend:i[2].value.trim()};}).filter(k=>k.name),
+    decisions: [...document.getElementById('rp-decisions').querySelectorAll('.mf-row')].map(r=>{const t=r.querySelectorAll('textarea');return{q:t[0].value.trim(),why:t[1].value.trim(),reconsider:t[2]?t[2].value.trim():''}}).filter(d=>d.q),
+    figmaFrames: [...document.getElementById('rp-frames').querySelectorAll('.mf-row')].map(r=>r.querySelector('input').value.trim()).filter(Boolean),
+    owners: [...document.getElementById('rp-owners').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),role:i[1].value.trim()};}).filter(o=>o.name),
+  };
+  renderSidebarScreens();
+  document.getElementById('screen-badge').textContent = name;
+  renderScreenInfo(currentScreen);
+}
+
+// 우측 패널 동적 행 추가
+function rpAddKpiRow(name='',value='',trend=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="지표명" value="${name}"><input class="mf-input" placeholder="목표값" value="${value}"><input class="mf-input" placeholder="트렌드" value="${trend}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-kpis').appendChild(row);}
+function rpAddDecisionRow(q='',why='',reconsider=''){const row=document.createElement('div');row.className='mf-row';row.style.cssText='flex-direction:column;gap:5px;position:relative';row.innerHTML=`<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><textarea class="mf-input" placeholder="결정 내용" style="min-height:60px;resize:none;width:100%">${q}</textarea><textarea class="mf-input" placeholder="이유" style="min-height:60px;resize:none;width:100%">${why}</textarea><textarea class="mf-input" placeholder="재논의 조건 (선택)" style="min-height:60px;resize:none;width:100%">${reconsider}</textarea>`;document.getElementById('rp-decisions').appendChild(row);}
+function rpAddFrameRow(val=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="피그마 프레임명" value="${val}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-frames').appendChild(row);}
+function rpAddOwnerRow(name='',role=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="이름" value="${name}"><input class="mf-input" placeholder="팀" value="${role}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-owners').appendChild(row);}
+
+renderSidebarScreens();
+renderQaList('all');
+</script>
+</body>
+</html>
