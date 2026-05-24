@@ -354,15 +354,7 @@
         <div class="qa-sub-tab" onclick="switchQaTab('resolved',this)">해결됨</div>
       </div>
       <div class="qa-list" id="qa-list"></div>
-      <div class="qa-detail" id="qa-detail">
-        <div class="detail-q" id="detail-q"></div>
-        <div class="detail-al">답변</div>
-        <div class="detail-a" id="detail-a"></div>
-        <div class="detail-actions">
-          <button class="det-btn primary">✓ 해결됨</button>
-          <button class="det-btn secondary" onclick="closeDetail()">닫기</button>
-        </div>
-      </div>
+      <div class="qa-detail" id="qa-detail"></div>
       <div class="qa-compose">
         <textarea class="compose-input" id="compose-q" placeholder="이 화면에 대해 궁금한 점을 적어주세요..." rows="2"></textarea>
         <div class="compose-row">
@@ -585,12 +577,119 @@ function cancelInfoEdit() {
 
 function renderQaList(tab) {
   const items = (qaData[currentScreen]||[]).filter(d=>tab==='all'||d.status===tab);
-  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail(${d.id})"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${d.q}</div></div><div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':'피그마'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
+  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail('${d.id}')"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${d.q}</div></div><div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':'피그마'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
   document.getElementById('qa-count').textContent = (qaData[currentScreen]||[]).length;
 }
 
-function showDetail(id) { const all=Object.values(qaData).flat(), d=all.find(x=>x.id===id); if(!d) return; activeQaCard=id; document.getElementById('detail-q').textContent=d.q; document.getElementById('detail-a').textContent=d.a||'아직 답변이 없습니다.'; document.getElementById('qa-detail').classList.add('open'); renderQaList(currentQaTab); }
-function closeDetail() { activeQaCard=null; document.getElementById('qa-detail').classList.remove('open'); renderQaList(currentQaTab); }
+function findQaItem(id) {
+  for (const [key, items] of Object.entries(qaData)) {
+    const item = items.find(x => x.id === id);
+    if (item) return { item, screenKey: key };
+  }
+  return null;
+}
+
+function showDetail(id) {
+  const found = findQaItem(id);
+  if (!found) return;
+  const { item: d, screenKey } = found;
+  activeQaCard = id;
+  const screenOptions = [
+    `<option value="__unassigned__" ${screenKey==='__unassigned__'?'selected':''}>미분류</option>`,
+    ...Object.entries(screens).map(([k,s])=>`<option value="${k}" ${screenKey===k?'selected':''}>${s.name}</option>`)
+  ].join('');
+  document.getElementById('qa-detail').innerHTML = `
+    <div class="detail-q">${d.q}</div>
+    <div class="detail-al">답변</div>
+    <div class="detail-a">${d.a||'아직 답변이 없습니다.'}</div>
+    <div class="detail-actions">
+      <button class="det-btn primary" onclick="toggleQaStatus('${id}')">${d.status==='resolved'?'↩ 미해결':'✓ 해결됨'}</button>
+      <button class="det-btn secondary" onclick="editQaItem('${id}')">수정</button>
+    </div>
+    <div style="display:flex;gap:5px;margin-top:5px;">
+      <select id="qa-move-select" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-family:'Geist',sans-serif;font-size:14px;color:var(--text2);outline:none;">${screenOptions}</select>
+      <button class="det-btn secondary" style="flex:0;padding:4px 10px;" onclick="moveQaItem('${id}')">이동</button>
+      <button class="det-btn secondary" style="flex:0;padding:4px 10px;color:var(--red);border-color:rgba(248,113,113,0.4);" onclick="deleteQaItem('${id}')">삭제</button>
+    </div>
+    <button class="det-btn secondary" style="width:100%;margin-top:5px;" onclick="closeDetail()">닫기</button>`;
+  document.getElementById('qa-detail').classList.add('open');
+  renderQaList(currentQaTab);
+}
+
+function editQaItem(id) {
+  const found = findQaItem(id);
+  if (!found) return;
+  const { item: d } = found;
+  document.getElementById('qa-detail').innerHTML = `
+    <div class="detail-al">질문</div>
+    <textarea id="edit-q" class="compose-input" style="min-height:60px;">${d.q}</textarea>
+    <div class="detail-al" style="margin-top:6px;">답변</div>
+    <textarea id="edit-a" class="compose-input" style="min-height:60px;">${d.a||''}</textarea>
+    <div class="detail-actions" style="margin-top:6px;">
+      <button class="det-btn primary" onclick="saveQaEdit('${id}')">저장</button>
+      <button class="det-btn secondary" onclick="showDetail('${id}')">취소</button>
+    </div>`;
+}
+
+async function saveQaEdit(id) {
+  const q = document.getElementById('edit-q').value.trim();
+  const a = document.getElementById('edit-a').value.trim();
+  if (!q) return;
+  const {error} = await sb.from('qa_items').update({question:q, answer:a}).eq('id', id);
+  if (error) { alert('저장 실패: ' + error.message); return; }
+  const found = findQaItem(id);
+  if (found) { found.item.q = q; found.item.a = a; }
+  showDetail(id);
+  renderQaList(currentQaTab);
+}
+
+async function deleteQaItem(id) {
+  if (!confirm('이 Q&A를 삭제할까요?')) return;
+  const {error} = await sb.from('qa_items').delete().eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+  const found = findQaItem(id);
+  if (found) {
+    qaData[found.screenKey] = qaData[found.screenKey].filter(x => x.id !== id);
+    if (!qaData[found.screenKey].length) delete qaData[found.screenKey];
+  }
+  activeQaCard = null;
+  closeDetail();
+  renderQaList(currentQaTab);
+  renderSidebarScreens();
+}
+
+async function moveQaItem(id) {
+  const newScreenKey = document.getElementById('qa-move-select').value;
+  const found = findQaItem(id);
+  if (!found || found.screenKey === newScreenKey) return;
+  const newScreenId = newScreenKey === '__unassigned__' ? null : newScreenKey;
+  const {error} = await sb.from('qa_items').update({screen_id: newScreenId}).eq('id', id);
+  if (error) { alert('이동 실패: ' + error.message); return; }
+  const item = {...found.item};
+  qaData[found.screenKey] = qaData[found.screenKey].filter(x => x.id !== id);
+  if (!qaData[newScreenKey]) qaData[newScreenKey] = [];
+  qaData[newScreenKey].unshift(item);
+  currentScreen = newScreenKey;
+  renderSidebarScreens();
+  renderQaList(currentQaTab);
+  showDetail(id);
+}
+
+async function toggleQaStatus(id) {
+  const found = findQaItem(id);
+  if (!found) return;
+  const newStatus = found.item.status === 'resolved' ? 'open' : 'resolved';
+  const {error} = await sb.from('qa_items').update({
+    status: newStatus,
+    resolved_at: newStatus === 'resolved' ? new Date().toISOString() : null
+  }).eq('id', id);
+  if (error) { alert('변경 실패: ' + error.message); return; }
+  found.item.status = newStatus;
+  showDetail(id);
+  renderQaList(currentQaTab);
+}
+
+function closeDetail() { activeQaCard=null; document.getElementById('qa-detail').classList.remove('open'); document.getElementById('qa-detail').innerHTML=''; renderQaList(currentQaTab); }
 function switchRpTab(tab) { currentRpTab=tab; ['info','qa'].forEach(t=>{document.getElementById(`tab-${t}`).classList.toggle('active',t===tab); document.getElementById(`pane-${t}`)?.classList.toggle('active',t===tab);}); }
 function switchQaTab(tab,el) { currentQaTab=tab; document.querySelectorAll('.qa-sub-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); closeDetail(); renderQaList(tab); }
 function selectScreen(el,key) {
