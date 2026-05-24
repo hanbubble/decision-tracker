@@ -11,6 +11,7 @@ async function fetchSlackMessage(channel, ts) {
     { headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` } }
   );
   const data = await res.json();
+  if (!data.ok) console.error('Slack API error:', data.error);
   return data.messages?.[0]?.text || '';
 }
 

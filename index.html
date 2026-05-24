@@ -593,7 +593,18 @@ function showDetail(id) { const all=Object.values(qaData).flat(), d=all.find(x=>
 function closeDetail() { activeQaCard=null; document.getElementById('qa-detail').classList.remove('open'); renderQaList(currentQaTab); }
 function switchRpTab(tab) { currentRpTab=tab; ['info','qa'].forEach(t=>{document.getElementById(`tab-${t}`).classList.toggle('active',t===tab); document.getElementById(`pane-${t}`)?.classList.toggle('active',t===tab);}); }
 function switchQaTab(tab,el) { currentQaTab=tab; document.querySelectorAll('.qa-sub-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); closeDetail(); renderQaList(tab); }
-function selectScreen(el,key) { currentScreen=key; document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); document.getElementById('screen-badge').textContent=screens[key].name; closeDetail(); renderScreenInfo(key); renderQaList(currentQaTab); }
+function selectScreen(el,key) {
+  currentScreen=key;
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  if (key === '__unassigned__') {
+    document.getElementById('screen-badge').textContent = '미분류 Q&A';
+    closeDetail(); renderScreenInfo(null); renderQaList(currentQaTab); switchRpTab('qa');
+  } else {
+    document.getElementById('screen-badge').textContent=screens[key].name;
+    closeDetail(); renderScreenInfo(key); renderQaList(currentQaTab);
+  }
+}
 function activateSb(el) { document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); }
 function loadFigma() { const u=document.getElementById('figma-url').value.trim(); if(!u) return; const f=document.getElementById('figma-iframe'); f.src='https://www.figma.com/embed?embed_host=share&url='+encodeURIComponent(u); f.style.display='block'; document.getElementById('figma-ph').style.display='none'; }
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
@@ -614,13 +625,20 @@ async function submitQ() {
 // 사이드바 화면 목록 렌더링
 function renderSidebarScreens() {
   const container = document.getElementById('sb-screens');
+  const unassignedCount = (qaData['__unassigned__']||[]).length;
+  const unassignedItem = unassignedCount > 0
+    ? `<div class="sb-item${currentScreen==='__unassigned__'?' active':''}" onclick="selectScreen(this,'__unassigned__')" style="border-left-color:var(--blue)">
+        <div class="sb-dot" style="background:var(--blue)"></div>미분류 Q&A
+        <span class="sb-count" style="${currentScreen==='__unassigned__'?'background:rgba(96,165,250,0.15);color:var(--blue)':''}">${unassignedCount}</span>
+      </div>`
+    : '';
   container.innerHTML = Object.entries(screens).map(([key, s]) =>
     `<div class="sb-item${currentScreen===key?' active':''}" onclick="selectScreen(this,'${key}')">
       <div class="sb-dot"></div>${s.name}
       <span class="sb-count">${(qaData[key]||[]).length}</span>
       <span onclick="event.stopPropagation();openScreenModal('${key}')" style="margin-left:4px;font-size:12px;color:var(--text3);cursor:pointer;opacity:0.7" title="편집">✎</span>
     </div>`
-  ).join('');
+  ).join('') + unassignedItem;
 }
 
 // 모달 열기 (key 있으면 편집 모드)
@@ -750,16 +768,17 @@ async function init() {
   const {data:qData, error:qErr} = await sb.from('qa_items').select('*').order('created_at', {ascending:false});
   if (qErr) console.error('qa_items 로드 실패:', qErr);
   (qData||[]).forEach(row => {
-    const k = row.screen_id;
+    const k = row.screen_id || '__unassigned__';
     if (!qaData[k]) qaData[k] = [];
     qaData[k].push({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:formatTime(row.created_at)});
   });
   searchIndex = buildIndex();
   sb.channel('realtime-qa').on('postgres_changes', {event:'INSERT', schema:'public', table:'qa_items'}, payload => {
     const row = payload.new;
-    if (!qaData[row.screen_id]) qaData[row.screen_id] = [];
-    qaData[row.screen_id].unshift({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:'방금'});
-    if (row.screen_id === currentScreen) renderQaList(currentQaTab);
+    const k = row.screen_id || '__unassigned__';
+    if (!qaData[k]) qaData[k] = [];
+    qaData[k].unshift({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:'방금'});
+    if (k === currentScreen) renderQaList(currentQaTab);
     renderSidebarScreens();
     searchIndex = buildIndex();
   }).subscribe();
