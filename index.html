@@ -743,11 +743,7 @@ function formatTime(iso) {
 
 async function init() {
   const {data:sData, error:sErr} = await sb.from('screens').select('*').order('created_at');
-  if (sErr) {
-    console.error('screens 로드 실패:', sErr);
-    document.getElementById('sb-screens').innerHTML = `<div style="padding:8px 12px;font-size:13px;color:var(--red)">로드 실패: ${sErr.message}</div>`;
-  }
-  console.log('screens loaded:', sData);
+  if (sErr) console.error('screens 로드 실패:', sErr);
   (sData||[]).forEach(row => {
     screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[]};
   });
