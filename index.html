@@ -187,6 +187,7 @@
   .qa-status.resolved { background: var(--green-bg); color: var(--green); }
   .qa-status.open { background: var(--red-bg); color: var(--red); }
   .qa-q { font-size: 17px; font-weight: 500; color: var(--text); line-height: 1.4; flex: 1; }
+  .qa-a-preview { font-size: 14px; color: var(--text2); line-height: 1.5; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
   .qa-meta { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
   .qa-tag { font-size: 14px; padding: 1px 4px; border-radius: 3px; background: var(--tag-bg); color: var(--text3); border: 1px solid var(--border); }
   .qa-time { font-size: 14px; color: var(--text3); margin-left: auto; }
@@ -577,7 +578,7 @@ function cancelInfoEdit() {
 
 function renderQaList(tab) {
   const items = (qaData[currentScreen]||[]).filter(d=>tab==='all'||d.status===tab);
-  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail('${d.id}')"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${d.q}</div></div><div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':'피그마'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
+  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail('${d.id}')"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${d.q}</div></div>${d.a?`<div class="qa-a-preview">${d.a.length>120?d.a.slice(0,120)+'…':d.a}</div>`:''}<div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':d.source==='figma'?'피그마':'직접입력'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
   document.getElementById('qa-count').textContent = (qaData[currentScreen]||[]).length;
 }
 
