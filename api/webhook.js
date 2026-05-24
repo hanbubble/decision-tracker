@@ -5,6 +5,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+async function fetchSlackMessage(channel, ts) {
+  const res = await fetch(
+    `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=true&limit=1`,
+    { headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` } }
+  );
+  const data = await res.json();
+  return data.messages?.[0]?.text || '';
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -23,17 +32,31 @@ module.exports = async function handler(req, res) {
     // reaction_added: ❓ 이모지 달린 메시지 수집
     if (body.event?.type === 'reaction_added' && body.event?.reaction === 'question') {
       const event = body.event;
+      const channel = event.item?.channel;
+      const ts = event.item?.ts;
+
+      // 원본 메시지 내용 가져오기
+      let question = '';
       try {
-        await supabase.from('qa_items').insert({
-          question: `슬랙 메시지 (채널: ${event.item?.channel || '알 수 없음'})`,
-          status: 'open',
-          source: 'slack',
-          slack_channel: event.item?.channel,
-          slack_ts: event.item?.ts,
-          source_author: event.user,
-        });
+        question = await fetchSlackMessage(channel, ts);
       } catch (e) {
-        console.error('Supabase insert error:', e);
+        console.error('Slack API error:', e);
+      }
+
+      if (question) {
+        try {
+          await supabase.from('qa_items').insert({
+            question,
+            status: 'open',
+            source: 'slack',
+            slack_channel: channel,
+            slack_ts: ts,
+            source_author: event.user,
+            source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
+          });
+        } catch (e) {
+          console.error('Supabase insert error:', e);
+        }
       }
     }
 
