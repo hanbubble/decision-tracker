@@ -35,28 +35,30 @@ module.exports = async function handler(req, res) {
       const channel = event.item?.channel;
       const ts = event.item?.ts;
 
-      // 원본 메시지 내용 가져오기
-      let question = '';
+      // 원본 메시지 내용 가져오기 (실패해도 계속 진행)
+      let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
       try {
-        question = await fetchSlackMessage(channel, ts);
+        const text = await fetchSlackMessage(channel, ts);
+        if (text) question = text;
       } catch (e) {
         console.error('Slack API error:', e);
       }
 
-      if (question) {
-        try {
-          await supabase.from('qa_items').insert({
-            question,
-            status: 'open',
-            source: 'slack',
-            slack_channel: channel,
-            slack_ts: ts,
-            source_author: event.user,
-            source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
-          });
-        } catch (e) {
-          console.error('Supabase insert error:', e);
-        }
+      console.log('Inserting Q&A:', { question, channel, ts });
+      try {
+        const { error } = await supabase.from('qa_items').insert({
+          question,
+          status: 'open',
+          source: 'slack',
+          slack_channel: channel,
+          slack_ts: ts,
+          source_author: event.user,
+          source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
+        });
+        if (error) console.error('Supabase insert error:', error);
+        else console.log('Q&A saved successfully');
+      } catch (e) {
+        console.error('Supabase insert error:', e);
       }
     }
 
