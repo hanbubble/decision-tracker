@@ -78,15 +78,15 @@ module.exports = async function handler(req, res) {
 
       if (answerText) {
         // 부모 메시지 ts로 Q&A 찾기
-        const { data: existing, error: findErr } = await supabase
+        const { data: existing } = await supabase
           .from('qa_items')
           .select('id')
           .eq('slack_channel', channel)
           .eq('slack_ts', parentTs)
-          .single();
+          .maybeSingle();
 
-        if (findErr) {
-          console.error('Q&A not found for ts:', parentTs, findErr.message);
+        if (!existing) {
+          console.error('Q&A not found for ts:', parentTs, '(❓ 먼저 등록 필요)');
         } else {
           const { error } = await supabase
             .from('qa_items')
