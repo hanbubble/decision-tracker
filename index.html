@@ -247,6 +247,7 @@
   .rp-field-section { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px; }
   .rp-field-section:last-child { border-bottom: none; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -423,6 +424,10 @@ const GEMINI_API_KEY = 'AIzaSyCcYUH6hluJ5zhsBZMKJh_Y94GhwtRkobs'
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
 
+const SUPABASE_URL = 'https://xrvjbkrhuohvsyzmiuti.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WPM-JkBAGI5hbOVF7do_Fw_d09RaU_S';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const screens = {};
 
 const qaData = {};
@@ -431,16 +436,16 @@ function buildIndex() {
   const items = [];
   Object.entries(screens).forEach(([key, s]) => {
     items.push({type:'screen',screenKey:key,title:s.name,body:s.purpose,sub:'화면 목적'});
-    s.decisions.forEach(d => items.push({type:'decision',screenKey:key,title:d.q,body:d.why,sub:s.name+' · 결정사항'}));
-    s.kpis.forEach(k => items.push({type:'screen',screenKey:key,title:k.name,body:k.value+' '+k.trend,sub:s.name+' · KPI'}));
-    s.reconsider.forEach(r => items.push({type:'screen',screenKey:key,title:r,body:'',sub:s.name+' · 재논의조건'}));
+    (s.decisions||[]).forEach(d => items.push({type:'decision',screenKey:key,title:d.q,body:d.why,sub:s.name+' · 결정사항'}));
+    (s.kpis||[]).forEach(k => items.push({type:'screen',screenKey:key,title:k.name,body:k.value+' '+k.trend,sub:s.name+' · KPI'}));
+    (s.decisions||[]).forEach(d => { if (d.reconsider) items.push({type:'screen',screenKey:key,title:d.reconsider,body:'',sub:s.name+' · 재논의조건'}); });
   });
   Object.entries(qaData).forEach(([key, qas]) => {
     qas.forEach(q => items.push({type:'qa',screenKey:key,qaId:q.id,title:q.q,body:q.a||'',status:q.status,source:q.source,sub:screens[key]?.name+' · Q&A'}));
   });
   return items;
 }
-const searchIndex = buildIndex();
+let searchIndex = [];
 
 let searchMode='keyword', searchTimer=null, currentScreen=null, currentRpTab='info', currentQaTab='all', activeQaCard=null, specOpen=false, aiController=null;
 
@@ -512,10 +517,8 @@ function renderResults(results, query, aiSummary, thinking) {
 
 function navigateTo(screenKey, tab, qaId) {
   closeDropdown(); document.getElementById('search-input').value='';
-  const keys=['login','dashboard','product','payment','mypage'], idx=keys.indexOf(screenKey);
-  const sbItems=document.querySelectorAll('.sb-item');
-  if (idx>=0) { sbItems.forEach(i=>i.classList.remove('active')); sbItems[idx].classList.add('active'); }
   currentScreen=screenKey; document.getElementById('screen-badge').textContent=screens[screenKey]?.name||'';
+  renderSidebarScreens();
   renderScreenInfo(screenKey); renderQaList(currentQaTab); switchRpTab(tab);
   if (qaId) setTimeout(()=>showDetail(qaId),100);
 }
@@ -596,7 +599,17 @@ function loadFigma() { const u=document.getElementById('figma-url').value.trim()
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
 function loadSpec() { const u=document.getElementById('spec-url').value.trim(); if(!u) return; const f=document.getElementById('spec-iframe'); f.src=u.includes('/edit')?u.replace('/edit','')+'/preview':u; f.style.display='block'; document.getElementById('spec-empty').style.display='none'; if(!specOpen) toggleSpec(); }
 function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
-function submitQ() { const q=document.getElementById('compose-q').value.trim(); if(!q) return; if(!qaData[currentScreen]) qaData[currentScreen]=[]; qaData[currentScreen].unshift({id:Date.now(),q,a:'',status:'open',tags:['기타'],source:'manual',time:'방금'}); document.getElementById('compose-q').value=''; renderQaList(currentQaTab); switchRpTab('qa'); }
+async function submitQ() {
+  const q=document.getElementById('compose-q').value.trim();
+  if(!q) return;
+  const {data:inserted,error}=await sb.from('qa_items').insert({screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']}).select().single();
+  if(error){console.error(error);return;}
+  if(!qaData[currentScreen]) qaData[currentScreen]=[];
+  qaData[currentScreen].unshift({id:inserted.id,q:inserted.question,a:'',status:'open',tags:['기타'],source:'manual',time:'방금'});
+  document.getElementById('compose-q').value='';
+  renderQaList(currentQaTab);
+  switchRpTab('qa');
+}
 
 // 사이드바 화면 목록 렌더링
 function renderSidebarScreens() {
@@ -657,47 +670,60 @@ function addOwnerRow(name='', role='') {
 }
 
 // 저장
-function saveScreen() {
+async function saveScreen() {
   const name = document.getElementById('mf-name').value.trim();
   if (!name) { document.getElementById('mf-name').focus(); return; }
-  const key = editingKey || 'screen_' + Date.now();
   const kpiRows = document.getElementById('mf-kpis').querySelectorAll('.mf-row');
   const decRows = document.getElementById('mf-decisions').querySelectorAll('.mf-row');
   const frmRows = document.getElementById('mf-frames').querySelectorAll('.mf-row');
   const ownRows = document.getElementById('mf-owners').querySelectorAll('.mf-row');
-  screens[key] = {
+  const payload = {
     name,
     purpose: document.getElementById('mf-purpose').value.trim(),
     kpis: [...kpiRows].map(r => { const i=r.querySelectorAll('input'); return {name:i[0].value.trim(),value:i[1].value.trim(),trend:i[2].value.trim()}; }).filter(k=>k.name),
     decisions: [...decRows].map(r => { const t=r.querySelectorAll('textarea'); return {q:t[0].value.trim(),why:t[1].value.trim(),reconsider:t[2]?t[2].value.trim():''}; }).filter(d=>d.q),
-    figmaFrames: [...frmRows].map(r => r.querySelector('input').value.trim()).filter(Boolean),
-    history: screens[key]?.history || [],
+    figma_frames: [...frmRows].map(r => r.querySelector('input').value.trim()).filter(Boolean),
     owners: [...ownRows].map(r => { const i=r.querySelectorAll('input'); return {name:i[0].value.trim(),role:i[1].value.trim()}; }).filter(o=>o.name),
   };
+  let key;
+  if (editingKey) {
+    const {error} = await sb.from('screens').update(payload).eq('id', editingKey);
+    if (error) { alert('저장 실패: ' + error.message); return; }
+    key = editingKey;
+  } else {
+    const {data:row, error} = await sb.from('screens').insert(payload).select().single();
+    if (error) { alert('저장 실패: ' + error.message); return; }
+    key = row.id;
+  }
+  screens[key] = {name:payload.name, purpose:payload.purpose, kpis:payload.kpis, decisions:payload.decisions, figmaFrames:payload.figma_frames, owners:payload.owners, history:screens[key]?.history||[]};
   if (!editingKey) currentScreen = key;
   closeScreenModal();
   renderSidebarScreens();
   document.getElementById('screen-badge').textContent = screens[key].name;
   renderScreenInfo(key);
   renderQaList(currentQaTab);
+  searchIndex = buildIndex();
 }
 
 // 우측 패널 저장
-function saveScreenFromPanel() {
+async function saveScreenFromPanel() {
   const name = document.getElementById('rp-name').value.trim();
   if (!name) { document.getElementById('rp-name').focus(); return; }
-  screens[currentScreen] = {
-    ...screens[currentScreen],
+  const payload = {
     name,
     purpose: document.getElementById('rp-purpose').value.trim(),
     kpis: [...document.getElementById('rp-kpis').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),value:i[1].value.trim(),trend:i[2].value.trim()};}).filter(k=>k.name),
     decisions: [...document.getElementById('rp-decisions').querySelectorAll('.mf-row')].map(r=>{const t=r.querySelectorAll('textarea');return{q:t[0].value.trim(),why:t[1].value.trim(),reconsider:t[2]?t[2].value.trim():''}}).filter(d=>d.q),
-    figmaFrames: [...document.getElementById('rp-frames').querySelectorAll('.mf-row')].map(r=>r.querySelector('input').value.trim()).filter(Boolean),
+    figma_frames: [...document.getElementById('rp-frames').querySelectorAll('.mf-row')].map(r=>r.querySelector('input').value.trim()).filter(Boolean),
     owners: [...document.getElementById('rp-owners').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),role:i[1].value.trim()};}).filter(o=>o.name),
   };
+  const {error} = await sb.from('screens').update(payload).eq('id', currentScreen);
+  if (error) { alert('저장 실패: ' + error.message); return; }
+  screens[currentScreen] = {...screens[currentScreen], name:payload.name, purpose:payload.purpose, kpis:payload.kpis, decisions:payload.decisions, figmaFrames:payload.figma_frames, owners:payload.owners};
   renderSidebarScreens();
   document.getElementById('screen-badge').textContent = name;
   renderScreenInfo(currentScreen);
+  searchIndex = buildIndex();
 }
 
 // 우측 패널 동적 행 추가
@@ -706,8 +732,42 @@ function rpAddDecisionRow(q='',why='',reconsider=''){const row=document.createEl
 function rpAddFrameRow(val=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="피그마 프레임명" value="${val}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-frames').appendChild(row);}
 function rpAddOwnerRow(name='',role=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="이름" value="${name}"><input class="mf-input" placeholder="팀" value="${role}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-owners').appendChild(row);}
 
-renderSidebarScreens();
-renderQaList('all');
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), now = new Date(), diff = now - d;
+  if (diff < 60000) return '방금';
+  if (diff < 3600000) return Math.floor(diff/60000) + '분 전';
+  if (diff < 86400000) return Math.floor(diff/3600000) + '시간 전';
+  return d.toLocaleDateString('ko-KR', {month:'short', day:'numeric'});
+}
+
+async function init() {
+  const {data:sData, error:sErr} = await sb.from('screens').select('*').order('created_at');
+  if (sErr) console.error('screens 로드 실패:', sErr);
+  (sData||[]).forEach(row => {
+    screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[]};
+  });
+  const {data:qData, error:qErr} = await sb.from('qa_items').select('*').order('created_at', {ascending:false});
+  if (qErr) console.error('qa_items 로드 실패:', qErr);
+  (qData||[]).forEach(row => {
+    const k = row.screen_id;
+    if (!qaData[k]) qaData[k] = [];
+    qaData[k].push({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:formatTime(row.created_at)});
+  });
+  searchIndex = buildIndex();
+  sb.channel('realtime-qa').on('postgres_changes', {event:'INSERT', schema:'public', table:'qa_items'}, payload => {
+    const row = payload.new;
+    if (!qaData[row.screen_id]) qaData[row.screen_id] = [];
+    qaData[row.screen_id].unshift({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:'방금'});
+    if (row.screen_id === currentScreen) renderQaList(currentQaTab);
+    renderSidebarScreens();
+    searchIndex = buildIndex();
+  }).subscribe();
+  renderSidebarScreens();
+  renderQaList('all');
+}
+
+init();
 </script>
 </body>
 </html>
