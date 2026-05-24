@@ -5,15 +5,40 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// 슬랙 메시지 전체 객체 반환 (text + thread_ts 포함)
-async function fetchSlackMessage(channel, ts) {
+const SLACK_HEADERS = () => ({
+  Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+});
+
+// 채널 메시지 가져오기 (스레드 답글 제외)
+async function fetchChannelMessage(channel, ts) {
   const res = await fetch(
     `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=true&limit=1`,
-    { headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` } }
+    { headers: SLACK_HEADERS() }
   );
   const data = await res.json();
-  if (!data.ok) console.error('Slack API error:', data.error);
+  if (!data.ok) console.error('Slack history error:', data.error);
   return data.messages?.[0] || null;
+}
+
+// 채널 메시지 + 스레드 답글 모두 커버
+async function fetchAnyMessage(channel, ts) {
+  const parent = await fetchChannelMessage(channel, ts);
+
+  // ts가 정확히 일치 → 채널 메시지
+  if (parent?.ts === ts) return parent;
+
+  // ts 불일치 → 스레드 답글. parent가 루트 메시지
+  if (parent) {
+    const res = await fetch(
+      `https://slack.com/api/conversations.replies?channel=${channel}&ts=${parent.ts}`,
+      { headers: SLACK_HEADERS() }
+    );
+    const data = await res.json();
+    if (!data.ok) console.error('Slack replies error:', data.error);
+    return data.messages?.find(m => m.ts === ts) || null;
+  }
+
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -26,7 +51,6 @@ module.exports = async function handler(req, res) {
 
   // ── Slack ──────────────────────────────────────────────────────────────
   if (source === 'slack') {
-    // URL 검증 challenge
     if (body.type === 'url_verification') {
       return res.status(200).json({ challenge: body.challenge });
     }
@@ -43,7 +67,7 @@ module.exports = async function handler(req, res) {
     if (event.reaction === 'question') {
       let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
       try {
-        const msg = await fetchSlackMessage(channel, ts);
+        const msg = await fetchAnyMessage(channel, ts);
         if (msg?.text) question = msg.text;
       } catch (e) {
         console.error('Slack fetch error:', e);
@@ -58,7 +82,7 @@ module.exports = async function handler(req, res) {
         source_author: event.user,
         source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
       });
-      if (error) console.error('Supabase insert error:', error);
+      if (error) console.error('Insert error:', error);
       else console.log('Q&A question saved:', question.slice(0, 60));
     }
 
@@ -68,16 +92,18 @@ module.exports = async function handler(req, res) {
       let parentTs = ts;
 
       try {
-        const msg = await fetchSlackMessage(channel, ts);
+        const msg = await fetchAnyMessage(channel, ts);
         if (msg?.text) answerText = msg.text;
-        // 스레드 답글이면 thread_ts가 부모 메시지 ts
-        if (msg?.thread_ts && msg.thread_ts !== ts) parentTs = msg.thread_ts;
+        // 스레드 답글이면 thread_ts = 부모 메시지 ts
+        if (msg?.thread_ts && msg.thread_ts !== msg.ts) {
+          parentTs = msg.thread_ts;
+        }
+        console.log('Answer msg ts:', msg?.ts, 'thread_ts:', msg?.thread_ts, 'parentTs:', parentTs);
       } catch (e) {
         console.error('Slack fetch error:', e);
       }
 
       if (answerText) {
-        // 부모 메시지 ts로 Q&A 찾기
         const { data: existing } = await supabase
           .from('qa_items')
           .select('id')
@@ -86,13 +112,13 @@ module.exports = async function handler(req, res) {
           .maybeSingle();
 
         if (!existing) {
-          console.error('Q&A not found for ts:', parentTs, '(❓ 먼저 등록 필요)');
+          console.error('Q&A not found for ts:', parentTs);
         } else {
           const { error } = await supabase
             .from('qa_items')
             .update({ answer: answerText, status: 'resolved', resolved_at: new Date().toISOString() })
             .eq('id', existing.id);
-          if (error) console.error('Supabase update error:', error);
+          if (error) console.error('Update error:', error);
           else console.log('Q&A answer updated:', answerText.slice(0, 60));
         }
       }
