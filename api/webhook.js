@@ -126,7 +126,7 @@ module.exports = async function handler(req, res) {
             }];
             const { error } = await supabase
               .from('qa_items')
-              .update({ answers: updatedAnswers, status: 'resolved', resolved_at: new Date().toISOString() })
+              .update({ answers: updatedAnswers, answer: answerText, status: 'resolved', resolved_at: new Date().toISOString() })
               .eq('id', existing.id);
             if (error) console.error('Update error:', error);
             else console.log('Q&A answer appended:', answerText.slice(0, 60));
