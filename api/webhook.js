@@ -107,14 +107,15 @@ module.exports = async function handler(req, res) {
       if (!answerText) {
         console.error('[A] No answer text — skipping update. Check Slack bot token scope (channels:history)');
       } else {
-        const { data: existing, error: selErr } = await supabase
+        const { data: rows, error: selErr } = await supabase
           .from('qa_items')
           .select('id, answers')
           .eq('slack_channel', channel)
           .eq('slack_ts', parentTs)
-          .maybeSingle();
+          .limit(1);
 
         if (selErr) console.error('[A] Select error:', selErr);
+        const existing = rows?.[0] || null;
 
         if (!existing) {
           console.error('[A] Q&A not found for ts:', parentTs, 'channel:', channel);
