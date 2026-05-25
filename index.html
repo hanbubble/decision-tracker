@@ -921,7 +921,6 @@ async function init() {
     const k = row.screen_id || '__unassigned__';
     if (!qaData[k]) qaData[k] = [];
     const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer, created_at:row.created_at}] : []);
-    console.log('[QA load]', row.id.slice(0,8), 'answers:', JSON.stringify(row.answers), '→ ans len:', ans.length, 'a:', ans[0]?.text?.slice(0,20));
     qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, time:formatTime(row.created_at)});
   });
   searchIndex = buildIndex();

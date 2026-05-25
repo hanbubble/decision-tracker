@@ -65,25 +65,30 @@ module.exports = async function handler(req, res) {
 
     // ── ❓ 질문 등록 ────────────────────────────────────────────────────
     if (event.reaction === 'question') {
-      let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
-      try {
-        const msg = await fetchAnyMessage(channel, ts);
-        if (msg?.text) question = msg.text;
-      } catch (e) {
-        console.error('Slack fetch error:', e);
-      }
+      const { data: dup } = await supabase.from('qa_items').select('id').eq('slack_channel', channel).eq('slack_ts', ts).limit(1);
+      if (dup && dup.length > 0) {
+        console.log('Q&A already exists for ts:', ts);
+      } else {
+        let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
+        try {
+          const msg = await fetchAnyMessage(channel, ts);
+          if (msg?.text) question = msg.text;
+        } catch (e) {
+          console.error('Slack fetch error:', e);
+        }
 
-      const { error } = await supabase.from('qa_items').insert({
-        question,
-        status: 'open',
-        source: 'slack',
-        slack_channel: channel,
-        slack_ts: ts,
-        source_author: event.user,
-        source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
-      });
-      if (error) console.error('Insert error:', error);
-      else console.log('Q&A question saved:', question.slice(0, 60));
+        const { error } = await supabase.from('qa_items').insert({
+          question,
+          status: 'open',
+          source: 'slack',
+          slack_channel: channel,
+          slack_ts: ts,
+          source_author: event.user,
+          source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
+        });
+        if (error) console.error('Insert error:', error);
+        else console.log('Q&A question saved:', question.slice(0, 60));
+      }
     }
 
     // ── 🅰️ 답변 업데이트 ─────────────────────────────────────────────
