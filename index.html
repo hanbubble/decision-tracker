@@ -626,8 +626,11 @@ function showDetail(id) {
       <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${d.q}</div>
     </div>
     <div>
-      <div class="mf-label">답변</div>
-      <div style="font-size:15px;color:${d.a?'var(--text2)':'var(--text3)'};line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;min-height:60px;">${d.a||'아직 답변이 없습니다.'}</div>
+      <div class="mf-label">답변 ${d.answers&&d.answers.length>1?`(${d.answers.length}개)`:''}</div>
+      ${d.answers&&d.answers.length
+        ? d.answers.map((ans,i)=>`<div style="margin-bottom:6px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">${d.answers.length>1?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px;">답변 ${i+1}</div>`:''}
+          <div style="font-size:15px;color:var(--text2);line-height:1.6;">${ans.text}</div></div>`).join('')
+        : `<div style="font-size:15px;color:var(--text3);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;min-height:60px;">아직 답변이 없습니다.</div>`}
     </div>
     <div>
       <div class="mf-label">화면 이동</div>
@@ -663,7 +666,8 @@ function editQaItem(id) {
     </div>
     <div>
       <div class="mf-label">답변</div>
-      <textarea id="edit-a" class="mf-input mf-textarea" style="min-height:100px;">${d.a||''}</textarea>
+      ${(d.answers&&d.answers.length ? d.answers : [{text:d.a||''}]).map((ans,i)=>`<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">${(d.answers&&d.answers.length>1)?`<span style="font-size:11px;color:var(--text3);padding-top:10px;min-width:32px;">답변${i+1}</span>`:''}
+        <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;">${ans.text}</textarea></div>`).join('')}
     </div>`;
 
   document.getElementById('qm-footer').innerHTML = `
@@ -673,12 +677,19 @@ function editQaItem(id) {
 
 async function saveQaEdit(id) {
   const q = document.getElementById('edit-q').value.trim();
-  const a = document.getElementById('edit-a').value.trim();
   if (!q) return;
-  const {error} = await sb.from('qa_items').update({question:q, answer:a}).eq('id', id);
-  if (error) { alert('저장 실패: ' + error.message); return; }
   const found = findQaItem(id);
-  if (found) { found.item.q = q; found.item.a = a; }
+  if (!found) return;
+  const origAnswers = found.item.answers && found.item.answers.length ? found.item.answers : [{text: found.item.a||''}];
+  const newAnswers = origAnswers.map((ans, i) => {
+    const el = document.getElementById(`edit-a-${i}`);
+    return el ? {...ans, text: el.value.trim()} : ans;
+  }).filter(ans => ans.text);
+  const {error} = await sb.from('qa_items').update({question:q, answers:newAnswers}).eq('id', id);
+  if (error) { alert('저장 실패: ' + error.message); return; }
+  found.item.q = q;
+  found.item.answers = newAnswers;
+  found.item.a = newAnswers.length ? newAnswers[0].text : '';
   showDetail(id);
   renderQaList(currentQaTab);
 }
@@ -909,18 +920,35 @@ async function init() {
   (qData||[]).forEach(row => {
     const k = row.screen_id || '__unassigned__';
     if (!qaData[k]) qaData[k] = [];
-    qaData[k].push({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:formatTime(row.created_at)});
+    const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer, created_at:row.created_at}] : []);
+    qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, time:formatTime(row.created_at)});
   });
   searchIndex = buildIndex();
-  sb.channel('realtime-qa').on('postgres_changes', {event:'INSERT', schema:'public', table:'qa_items'}, payload => {
-    const row = payload.new;
-    const k = row.screen_id || '__unassigned__';
-    if (!qaData[k]) qaData[k] = [];
-    qaData[k].unshift({id:row.id, q:row.question, a:row.answer||'', status:row.status, tags:row.tags||[], source:row.source, time:'방금'});
-    if (k === currentScreen) renderQaList(currentQaTab);
-    renderSidebarScreens();
-    searchIndex = buildIndex();
-  }).subscribe();
+  sb.channel('realtime-qa')
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'qa_items'}, payload => {
+      const row = payload.new;
+      const k = row.screen_id || '__unassigned__';
+      if (!qaData[k]) qaData[k] = [];
+      const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer, created_at:row.created_at}] : []);
+      qaData[k].unshift({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, time:'방금'});
+      if (k === currentScreen) renderQaList(currentQaTab);
+      renderSidebarScreens();
+      searchIndex = buildIndex();
+    })
+    .on('postgres_changes', {event:'UPDATE', schema:'public', table:'qa_items'}, payload => {
+      const row = payload.new;
+      const found = findQaItem(row.id);
+      if (found) {
+        const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer}] : []);
+        found.item.answers = ans;
+        found.item.a = ans.length ? ans[0].text : '';
+        found.item.status = row.status;
+        found.item.q = row.question;
+        if (found.screenKey === currentScreen) renderQaList(currentQaTab);
+        if (activeQaCard === row.id) showDetail(row.id);
+      }
+    })
+    .subscribe();
   renderSidebarScreens();
   renderQaList('all');
 }

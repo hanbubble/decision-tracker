@@ -106,7 +106,7 @@ module.exports = async function handler(req, res) {
       if (answerText) {
         const { data: existing } = await supabase
           .from('qa_items')
-          .select('id')
+          .select('id, answers')
           .eq('slack_channel', channel)
           .eq('slack_ts', parentTs)
           .maybeSingle();
@@ -114,12 +114,23 @@ module.exports = async function handler(req, res) {
         if (!existing) {
           console.error('Q&A not found for ts:', parentTs);
         } else {
-          const { error } = await supabase
-            .from('qa_items')
-            .update({ answer: answerText, status: 'resolved', resolved_at: new Date().toISOString() })
-            .eq('id', existing.id);
-          if (error) console.error('Update error:', error);
-          else console.log('Q&A answer updated:', answerText.slice(0, 60));
+          const currentAnswers = existing.answers || [];
+          if (currentAnswers.some(a => a.slack_ts === ts)) {
+            console.log('Answer already recorded for ts:', ts);
+          } else {
+            const updatedAnswers = [...currentAnswers, {
+              text: answerText,
+              author: event.user,
+              slack_ts: ts,
+              created_at: new Date().toISOString(),
+            }];
+            const { error } = await supabase
+              .from('qa_items')
+              .update({ answers: updatedAnswers, status: 'resolved', resolved_at: new Date().toISOString() })
+              .eq('id', existing.id);
+            if (error) console.error('Update error:', error);
+            else console.log('Q&A answer appended:', answerText.slice(0, 60));
+          }
         }
       }
     }
