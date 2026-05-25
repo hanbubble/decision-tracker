@@ -93,30 +93,38 @@ module.exports = async function handler(req, res) {
 
       try {
         const msg = await fetchAnyMessage(channel, ts);
+        console.log('[A] msg ok:', !!msg, 'text:', msg?.text?.slice(0, 40), 'thread_ts:', msg?.thread_ts, 'ts:', msg?.ts);
         if (msg?.text) answerText = msg.text;
-        // 스레드 답글이면 thread_ts = 부모 메시지 ts
         if (msg?.thread_ts && msg.thread_ts !== msg.ts) {
           parentTs = msg.thread_ts;
         }
-        console.log('Answer msg ts:', msg?.ts, 'thread_ts:', msg?.thread_ts, 'parentTs:', parentTs);
       } catch (e) {
-        console.error('Slack fetch error:', e);
+        console.error('[A] Slack fetch error:', e);
       }
 
-      if (answerText) {
-        const { data: existing } = await supabase
+      console.log('[A] answerText len:', answerText.length, 'parentTs:', parentTs);
+
+      if (!answerText) {
+        console.error('[A] No answer text — skipping update. Check Slack bot token scope (channels:history)');
+      } else {
+        const { data: existing, error: selErr } = await supabase
           .from('qa_items')
           .select('id, answers')
           .eq('slack_channel', channel)
           .eq('slack_ts', parentTs)
           .maybeSingle();
 
+        if (selErr) console.error('[A] Select error:', selErr);
+
         if (!existing) {
-          console.error('Q&A not found for ts:', parentTs);
+          console.error('[A] Q&A not found for ts:', parentTs, 'channel:', channel);
         } else {
-          const currentAnswers = existing.answers || [];
-          if (currentAnswers.some(a => a.slack_ts === ts)) {
-            console.log('Answer already recorded for ts:', ts);
+          const currentAnswers = Array.isArray(existing.answers) ? existing.answers : [];
+          const alreadySaved = currentAnswers.some(a => a.slack_ts === ts);
+          console.log('[A] currentAnswers:', currentAnswers.length, 'alreadySaved:', alreadySaved);
+
+          if (alreadySaved) {
+            console.log('[A] Already recorded for ts:', ts);
           } else {
             const updatedAnswers = [...currentAnswers, {
               text: answerText,
@@ -124,12 +132,22 @@ module.exports = async function handler(req, res) {
               slack_ts: ts,
               created_at: new Date().toISOString(),
             }];
+            // answers 배열 + legacy answer 필드 동시 업데이트
             const { error } = await supabase
               .from('qa_items')
               .update({ answers: updatedAnswers, answer: answerText, status: 'resolved', resolved_at: new Date().toISOString() })
               .eq('id', existing.id);
-            if (error) console.error('Update error:', error);
-            else console.log('Q&A answer appended:', answerText.slice(0, 60));
+            if (error) {
+              console.error('[A] Update with answers failed:', error, '— retrying with answer only');
+              const { error: err2 } = await supabase
+                .from('qa_items')
+                .update({ answer: answerText, status: 'resolved', resolved_at: new Date().toISOString() })
+                .eq('id', existing.id);
+              if (err2) console.error('[A] Fallback update error:', err2);
+              else console.log('[A] Fallback answer saved:', answerText.slice(0, 60));
+            } else {
+              console.log('[A] Answer appended:', answerText.slice(0, 60));
+            }
           }
         }
       }
