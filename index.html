@@ -95,6 +95,7 @@
   .link-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); outline: none; }
   .link-input:focus { border-color: var(--accent); }
   .link-input::placeholder { color: var(--text3); }
+  .spec-range-input { margin-top: 4px; }
   .load-btn { width: 100%; padding: 5px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 5px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); cursor: pointer; transition: all 0.15s; margin-top: 4px; }
   .load-btn:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -304,6 +305,7 @@
       <div>
         <div class="link-label">명세서 (구글 시트)</div>
         <input class="link-input" id="spec-url" placeholder="https://docs.google.com/..." onkeydown="if(event.key==='Enter')loadSpec()">
+        <input class="link-input spec-range-input" id="spec-range" placeholder="범위 (예: G4:G8)" onkeydown="if(event.key==='Enter')loadSpec()">
         <button class="load-btn" onclick="loadSpec()">명세서 열기</button>
       </div>
     </div>
@@ -782,7 +784,10 @@ function selectScreen(el,key) {
 function loadScreenLinks(key) {
   const s = key ? screens[key] : null;
   document.getElementById('figma-url').value = s?.figmaUrl || '';
-  document.getElementById('spec-url').value = s?.specUrl || '';
+  const savedSpec = s?.specUrl || '';
+  const specRangeSep = savedSpec.indexOf('#range=');
+  document.getElementById('spec-url').value = specRangeSep !== -1 ? savedSpec.slice(0, specRangeSep) : savedSpec;
+  document.getElementById('spec-range').value = specRangeSep !== -1 ? savedSpec.slice(specRangeSep + 7) : '';
   // reset figma iframe
   const fi = document.getElementById('figma-iframe');
   fi.src = ''; fi.style.display = 'none';
@@ -841,8 +846,7 @@ function loadFigma(save=true) {
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
 function loadSpec(save=true) {
   const u=document.getElementById('spec-url').value.trim(); if(!u) return;
-  const rangeMatch=u.match(/[#&?\/]range=([^&#\/\s]+)/);
-  const range=rangeMatch?rangeMatch[1]:'';
+  const range=document.getElementById('spec-range').value.trim();
   const sheetMatch=u.match(/\/d\/([a-zA-Z0-9_-]+)/);
   const gidMatch=u.match(/[?&#]gid=([0-9]+)/);
   document.getElementById('spec-empty').style.display='none';
@@ -881,8 +885,9 @@ function loadSpec(save=true) {
     document.getElementById('spec-iframe-wrap').style.display='block';
   }
   if(save && currentScreen && currentScreen!=='__unassigned__') {
-    screens[currentScreen].specUrl=u;
-    sb.from('screens').update({spec_url:u}).eq('id',currentScreen);
+    const saveVal = u + (range ? '#range='+range : '');
+    screens[currentScreen].specUrl=saveVal;
+    sb.from('screens').update({spec_url:saveVal}).eq('id',currentScreen);
   }
 }
 function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
