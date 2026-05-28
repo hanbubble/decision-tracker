@@ -766,6 +766,7 @@ function switchRpTab(tab) { currentRpTab=tab; ['info','qa'].forEach(t=>{document
 function switchQaTab(tab,el) { currentQaTab=tab; document.querySelectorAll('.qa-sub-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); closeDetail(); renderQaList(tab); }
 function selectScreen(el,key) {
   currentScreen=key;
+  localStorage.setItem('lastScreen', key);
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   el.classList.add('active');
   if (key === '__unassigned__') {
@@ -909,7 +910,7 @@ function renderSidebarScreens() {
     : '';
   container.innerHTML = screenOrder.filter(key=>screens[key]).map(key => {
     const s = screens[key];
-    return `<div class="sb-item${currentScreen===key?' active':''}" draggable="true"
+    return `<div class="sb-item${currentScreen===key?' active':''}" draggable="true" data-key="${key}"
       onclick="selectScreen(this,'${key}')"
       ondragstart="sbDragStart(event,'${key}')"
       ondragover="sbDragOver(event)"
@@ -1084,6 +1085,13 @@ async function init() {
     .subscribe();
   renderSidebarScreens();
   renderQaList('all');
+  // restore last selected screen
+  const lastKey = localStorage.getItem('lastScreen');
+  const restoreKey = (lastKey && (screens[lastKey] || lastKey==='__unassigned__')) ? lastKey : screenOrder[0];
+  if (restoreKey) {
+    const el = document.querySelector(`.sb-item[data-key="${restoreKey}"]`);
+    if (el) selectScreen(el, restoreKey);
+  }
 }
 
 init();
