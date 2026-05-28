@@ -843,7 +843,7 @@ function loadFigma(save=true) {
   f.style.display='block'; document.getElementById('figma-ph').style.display='none';
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     screens[currentScreen].figmaUrl=u;
-    sb.from('screens').update({figma_url:u}).eq('id',currentScreen);
+    sb.from('screens').update({figma_url:u}).eq('id',currentScreen).then(({error})=>{ if(error) console.error('figma_url 저장 실패:', error); });
     const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
     if(!lk[currentScreen]) lk[currentScreen]={};
     lk[currentScreen].figmaUrl=u;
@@ -894,7 +894,7 @@ function loadSpec(save=true) {
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     const saveVal = u + (range ? '#range='+range : '');
     screens[currentScreen].specUrl=saveVal;
-    sb.from('screens').update({spec_url:saveVal}).eq('id',currentScreen);
+    sb.from('screens').update({spec_url:saveVal}).eq('id',currentScreen).then(({error})=>{ if(error) console.error('spec_url 저장 실패:', error); });
     const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
     if(!lk[currentScreen]) lk[currentScreen]={};
     lk[currentScreen].specUrl=saveVal;
