@@ -827,17 +827,21 @@ function openFigma() { const u=document.getElementById('figma-url').value.trim()
 function loadSpec(save=true) {
   const u=document.getElementById('spec-url').value.trim(); if(!u) return;
   const f=document.getElementById('spec-iframe');
-  // Extract #range= or #gid= from hash fragment
-  let base=u, rangeParam='';
-  const hashIdx=u.indexOf('#');
-  if(hashIdx!==-1) {
-    const hash=u.slice(hashIdx+1);
-    base=u.slice(0,hashIdx);
-    const rangeMatch=hash.match(/range=([^&]+)/);
-    if(rangeMatch) rangeParam='&range='+rangeMatch[1];
+  // Extract range from anywhere in URL (hash or query)
+  const rangeMatch=u.match(/[#&?\/]range=([^&#\/\s]+)/);
+  const rangeParam=rangeMatch?'&range='+rangeMatch[1]:'';
+  // Extract sheet id and gid
+  const sheetMatch=u.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const gidMatch=u.match(/[?&#]gid=([0-9]+)/);
+  let src='';
+  if(sheetMatch) {
+    const sheetId=sheetMatch[1];
+    const gid=gidMatch?gidMatch[1]:'';
+    src='https://docs.google.com/spreadsheets/d/'+sheetId+'/preview?rm=minimal'+(gid?'&gid='+gid:'')+rangeParam;
+  } else {
+    src=u; // fallback
   }
-  const previewBase=base.includes('/edit')?base.replace('/edit','')+'/preview':base.replace(/\/pub.*$/,'')+'/preview';
-  f.src=previewBase+'?rm=minimal'+rangeParam;
+  f.src=src;
   document.getElementById('spec-iframe-wrap').style.display='block'; document.getElementById('spec-empty').style.display='none';
   if(!specOpen) toggleSpec();
   if(save && currentScreen && currentScreen!=='__unassigned__') {
