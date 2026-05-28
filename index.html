@@ -99,7 +99,7 @@
   .load-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* CENTER */
-  .center-col { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; min-width: 0; }
+  .center-col { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; min-width: 0; position: relative; }
   .panel-header { height: 38px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; gap: 7px; flex-shrink: 0; background: var(--surface); }
   .panel-title { font-size: 15px; font-weight: 500; color: var(--text2); letter-spacing: 0.07em; text-transform: uppercase; }
   .panel-badge { font-size: 15px; padding: 2px 6px; border-radius: 6px; background: var(--tag-bg); color: var(--text3); }
@@ -107,22 +107,23 @@
   .slack-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; padding: 2px 6px; border-radius: 6px; background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,0.2); }
   .slack-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
   .icon-btn { width: 24px; height: 24px; border-radius: 4px; background: transparent; border: 1px solid var(--border); color: var(--text3); cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; }
-  .figma-frame { flex: 1; background: var(--surface2); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .figma-frame { flex: 1; min-height: 0; background: var(--surface2); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
   .figma-frame::before { content:''; position:absolute; inset:0; background-image:linear-gradient(45deg,rgba(255,255,255,0.015) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,0.015) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,0.015) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,0.015) 75%); background-size:20px 20px; background-position:0 0,0 10px,10px -10px,-10px 0; }
   .figma-ph { position:relative; z-index:1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px; }
   .figma-icon-box { width:40px; height:40px; border-radius:10px; background:var(--surface); border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:27px; }
   .figma-ph p { font-size:18px; color:var(--text2); }
   .figma-ph span { font-size:15px; color:var(--text3); }
   #figma-iframe { width:100%; height:100%; border:none; display:none; position:relative; z-index:1; }
-  .spec-panel { flex-shrink:0; border-top:1px solid var(--border); background:var(--surface); overflow:hidden; transition:height 0.28s ease; height:38px; }
-  .spec-panel.open { height:200px; }
+  .spec-panel { position:absolute; bottom:-442px; left:0; right:0; height:480px; border-top:1px solid var(--border); background:var(--surface); overflow:hidden; transition:bottom 0.28s ease; z-index:10; }
+  .spec-panel.open { bottom:0; }
   .spec-header { height:38px; display:flex; align-items:center; padding:0 12px; gap:7px; cursor:pointer; }
   .spec-toggle { margin-left:auto; font-size:15px; color:var(--text3); display:flex; align-items:center; gap:3px; }
   .spec-toggle svg { transition:transform 0.28s; }
   .spec-panel.open .spec-toggle svg { transform:rotate(180deg); }
   .spec-panel.open .spec-toggle { color:var(--accent); }
-  .spec-body { height:162px; }
-  #spec-iframe { width:100%; height:100%; border:none; display:none; }
+  .spec-body { height:442px; overflow:hidden; position:relative; }
+  .spec-iframe-wrap { position:absolute; top:0; left:0; right:0; bottom:0; overflow:hidden; display:none; }
+  #spec-iframe { position:absolute; top:-150px; left:0; width:100%; height:calc(100% + 150px); border:none; }
   .spec-empty { display:flex; align-items:center; justify-content:center; height:100%; }
   .spec-empty p { font-size:17px; color:var(--text3); }
 
@@ -328,7 +329,9 @@
         </div>
       </div>
       <div class="spec-body">
-        <iframe id="spec-iframe"></iframe>
+        <div class="spec-iframe-wrap" id="spec-iframe-wrap">
+          <iframe id="spec-iframe"></iframe>
+        </div>
         <div class="spec-empty" id="spec-empty"><p>구글 시트 링크를 입력하면 여기에 표시돼요</p></div>
       </div>
     </div>
@@ -772,7 +775,8 @@ function loadScreenLinks(key) {
   document.getElementById('figma-ph').style.display = 'flex';
   // reset spec iframe
   const si = document.getElementById('spec-iframe');
-  si.src = ''; si.style.display = 'none';
+  si.src = '';
+  document.getElementById('spec-iframe-wrap').style.display = 'none';
   document.getElementById('spec-empty').style.display = 'block';
   // auto-load if saved
   if (s?.figmaUrl) loadFigma(false);
@@ -823,8 +827,18 @@ function openFigma() { const u=document.getElementById('figma-url').value.trim()
 function loadSpec(save=true) {
   const u=document.getElementById('spec-url').value.trim(); if(!u) return;
   const f=document.getElementById('spec-iframe');
-  f.src=u.includes('/edit')?u.replace('/edit','')+'/preview':u;
-  f.style.display='block'; document.getElementById('spec-empty').style.display='none';
+  // Extract #range= or #gid= from hash fragment
+  let base=u, rangeParam='';
+  const hashIdx=u.indexOf('#');
+  if(hashIdx!==-1) {
+    const hash=u.slice(hashIdx+1);
+    base=u.slice(0,hashIdx);
+    const rangeMatch=hash.match(/range=([^&]+)/);
+    if(rangeMatch) rangeParam='&range='+rangeMatch[1];
+  }
+  const previewBase=base.includes('/edit')?base.replace('/edit','')+'/preview':base.replace(/\/pub.*$/,'')+'/preview';
+  f.src=previewBase+'?rm=minimal'+rangeParam;
+  document.getElementById('spec-iframe-wrap').style.display='block'; document.getElementById('spec-empty').style.display='none';
   if(!specOpen) toggleSpec();
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     screens[currentScreen].specUrl=u;
