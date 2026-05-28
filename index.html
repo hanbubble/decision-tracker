@@ -783,11 +783,14 @@ function selectScreen(el,key) {
 }
 function loadScreenLinks(key) {
   const s = key ? screens[key] : null;
-  document.getElementById('figma-url').value = s?.figmaUrl || '';
-  const savedSpec = s?.specUrl || '';
-  const specRangeSep = savedSpec.indexOf('#range=');
-  document.getElementById('spec-url').value = specRangeSep !== -1 ? savedSpec.slice(0, specRangeSep) : savedSpec;
-  document.getElementById('spec-range').value = specRangeSep !== -1 ? savedSpec.slice(specRangeSep + 7) : '';
+  const lk = JSON.parse(localStorage.getItem('screenLinks')||'{}');
+  const local = key ? (lk[key]||{}) : {};
+  const figmaUrl = s?.figmaUrl || local.figmaUrl || '';
+  const specUrl  = s?.specUrl  || local.specUrl  || '';
+  document.getElementById('figma-url').value = figmaUrl;
+  const specRangeSep = specUrl.indexOf('#range=');
+  document.getElementById('spec-url').value   = specRangeSep !== -1 ? specUrl.slice(0, specRangeSep) : specUrl;
+  document.getElementById('spec-range').value = specRangeSep !== -1 ? specUrl.slice(specRangeSep + 7) : '';
   // reset figma iframe
   const fi = document.getElementById('figma-iframe');
   fi.src = ''; fi.style.display = 'none';
@@ -799,8 +802,8 @@ function loadScreenLinks(key) {
   document.getElementById('spec-range-content').style.display = 'none';
   document.getElementById('spec-empty').style.display = 'block';
   // auto-load if saved
-  if (s?.figmaUrl) loadFigma(false);
-  if (s?.specUrl) loadSpec(false);
+  if (figmaUrl) loadFigma(false);
+  if (specUrl)  loadSpec(false);
 }
 function activateSb(el) { document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); }
 
@@ -841,6 +844,10 @@ function loadFigma(save=true) {
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     screens[currentScreen].figmaUrl=u;
     sb.from('screens').update({figma_url:u}).eq('id',currentScreen);
+    const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
+    if(!lk[currentScreen]) lk[currentScreen]={};
+    lk[currentScreen].figmaUrl=u;
+    localStorage.setItem('screenLinks',JSON.stringify(lk));
   }
 }
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
@@ -888,6 +895,10 @@ function loadSpec(save=true) {
     const saveVal = u + (range ? '#range='+range : '');
     screens[currentScreen].specUrl=saveVal;
     sb.from('screens').update({spec_url:saveVal}).eq('id',currentScreen);
+    const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
+    if(!lk[currentScreen]) lk[currentScreen]={};
+    lk[currentScreen].specUrl=saveVal;
+    localStorage.setItem('screenLinks',JSON.stringify(lk));
   }
 }
 function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
@@ -1094,8 +1105,16 @@ async function init() {
   const lastKey = localStorage.getItem('lastScreen');
   const restoreKey = (lastKey && (screens[lastKey] || lastKey==='__unassigned__')) ? lastKey : screenOrder[0];
   if (restoreKey) {
+    currentScreen = restoreKey;
     const el = document.querySelector(`.sb-item[data-key="${restoreKey}"]`);
-    if (el) selectScreen(el, restoreKey);
+    if (el) { document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); }
+    if (restoreKey === '__unassigned__') {
+      document.getElementById('screen-badge').textContent='미분류 Q&A';
+      renderScreenInfo(null); renderQaList(currentQaTab); switchRpTab('qa'); loadScreenLinks(null);
+    } else if (screens[restoreKey]) {
+      document.getElementById('screen-badge').textContent=screens[restoreKey].name||'';
+      renderScreenInfo(restoreKey); renderQaList(currentQaTab); loadScreenLinks(restoreKey);
+    }
   }
 }
 
