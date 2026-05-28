@@ -291,12 +291,12 @@
     <div class="sb-bottom">
       <div>
         <div class="link-label">피그마 링크</div>
-        <input class="link-input" id="figma-url" placeholder="https://figma.com/...">
+        <input class="link-input" id="figma-url" placeholder="https://figma.com/..." onkeydown="if(event.key==='Enter')loadFigma()">
         <button class="load-btn" onclick="loadFigma()">피그마 열기</button>
       </div>
       <div>
         <div class="link-label">명세서 (구글 시트)</div>
-        <input class="link-input" id="spec-url" placeholder="https://docs.google.com/...">
+        <input class="link-input" id="spec-url" placeholder="https://docs.google.com/..." onkeydown="if(event.key==='Enter')loadSpec()">
         <button class="load-btn" onclick="loadSpec()">명세서 열기</button>
       </div>
     </div>
