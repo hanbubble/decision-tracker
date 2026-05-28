@@ -786,7 +786,6 @@ function renderSidebarScreens() {
     `<div class="sb-item${currentScreen===key?' active':''}" onclick="selectScreen(this,'${key}')">
       <div class="sb-dot"></div>${s.name}
       <span class="sb-count">${(qaData[key]||[]).length}</span>
-      <span onclick="event.stopPropagation();openScreenModal('${key}')" style="margin-left:4px;font-size:12px;color:var(--text3);cursor:pointer;opacity:0.7" title="편집">✎</span>
     </div>`
   ).join('') + unassignedItem;
 }
