@@ -123,7 +123,7 @@
   .spec-panel.open .spec-toggle { color:var(--accent); }
   .spec-body { height:442px; overflow:hidden; position:relative; }
   .spec-iframe-wrap { position:absolute; top:0; left:0; right:0; bottom:0; overflow:hidden; display:none; }
-  #spec-iframe { position:absolute; top:-150px; left:0; width:100%; height:calc(100% + 150px); border:none; }
+  #spec-iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:none; }
   .spec-empty { display:flex; align-items:center; justify-content:center; height:100%; }
   .spec-empty p { font-size:17px; color:var(--text3); }
 
@@ -827,21 +827,27 @@ function openFigma() { const u=document.getElementById('figma-url').value.trim()
 function loadSpec(save=true) {
   const u=document.getElementById('spec-url').value.trim(); if(!u) return;
   const f=document.getElementById('spec-iframe');
-  // Extract range from anywhere in URL (hash or query)
   const rangeMatch=u.match(/[#&?\/]range=([^&#\/\s]+)/);
-  const rangeParam=rangeMatch?'&range='+rangeMatch[1]:'';
-  // Extract sheet id and gid
+  const range=rangeMatch?rangeMatch[1]:'';
   const sheetMatch=u.match(/\/d\/([a-zA-Z0-9_-]+)/);
   const gidMatch=u.match(/[?&#]gid=([0-9]+)/);
   let src='';
   if(sheetMatch) {
     const sheetId=sheetMatch[1];
     const gid=gidMatch?gidMatch[1]:'';
-    src='https://docs.google.com/spreadsheets/d/'+sheetId+'/preview?rm=minimal'+(gid?'&gid='+gid:'')+rangeParam;
+    if(range) {
+      // gviz/tq actually supports range restriction
+      src='https://docs.google.com/spreadsheets/d/'+sheetId+'/gviz/tq?tqx=out:html'+(gid?'&gid='+gid:'')+'&range='+range+'&headers=0';
+    } else {
+      src='https://docs.google.com/spreadsheets/d/'+sheetId+'/preview?rm=minimal'+(gid?'&gid='+gid:'');
+    }
   } else {
-    src=u; // fallback
+    src=u;
   }
   f.src=src;
+  // hide google sheets toolbar for preview mode; gviz has no toolbar
+  f.style.top=range?'0':'-150px';
+  f.style.height=range?'100%':'calc(100% + 150px)';
   document.getElementById('spec-iframe-wrap').style.display='block'; document.getElementById('spec-empty').style.display='none';
   if(!specOpen) toggleSpec();
   if(save && currentScreen && currentScreen!=='__unassigned__') {
