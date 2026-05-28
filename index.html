@@ -755,10 +755,28 @@ function selectScreen(el,key) {
   if (key === '__unassigned__') {
     document.getElementById('screen-badge').textContent = '미분류 Q&A';
     closeDetail(); renderScreenInfo(null); renderQaList(currentQaTab); switchRpTab('qa');
+    loadScreenLinks(null);
   } else {
     document.getElementById('screen-badge').textContent=screens[key].name;
     closeDetail(); renderScreenInfo(key); renderQaList(currentQaTab);
+    loadScreenLinks(key);
   }
+}
+function loadScreenLinks(key) {
+  const s = key ? screens[key] : null;
+  document.getElementById('figma-url').value = s?.figmaUrl || '';
+  document.getElementById('spec-url').value = s?.specUrl || '';
+  // reset figma iframe
+  const fi = document.getElementById('figma-iframe');
+  fi.src = ''; fi.style.display = 'none';
+  document.getElementById('figma-ph').style.display = 'flex';
+  // reset spec iframe
+  const si = document.getElementById('spec-iframe');
+  si.src = ''; si.style.display = 'none';
+  document.getElementById('spec-empty').style.display = 'block';
+  // auto-load if saved
+  if (s?.figmaUrl) loadFigma(false);
+  if (s?.specUrl) loadSpec(false);
 }
 function activateSb(el) { document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); }
 
@@ -791,9 +809,28 @@ function sbDrop(e, targetKey) {
 async function saveScreenOrder() {
   await Promise.all(screenOrder.map((key, idx) => sb.from('screens').update({sort_order: idx}).eq('id', key)));
 }
-function loadFigma() { const u=document.getElementById('figma-url').value.trim(); if(!u) return; const f=document.getElementById('figma-iframe'); f.src='https://www.figma.com/embed?embed_host=share&url='+encodeURIComponent(u); f.style.display='block'; document.getElementById('figma-ph').style.display='none'; }
+function loadFigma(save=true) {
+  const u=document.getElementById('figma-url').value.trim(); if(!u) return;
+  const f=document.getElementById('figma-iframe');
+  f.src='https://www.figma.com/embed?embed_host=share&url='+encodeURIComponent(u);
+  f.style.display='block'; document.getElementById('figma-ph').style.display='none';
+  if(save && currentScreen && currentScreen!=='__unassigned__') {
+    screens[currentScreen].figmaUrl=u;
+    sb.from('screens').update({figma_url:u}).eq('id',currentScreen);
+  }
+}
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
-function loadSpec() { const u=document.getElementById('spec-url').value.trim(); if(!u) return; const f=document.getElementById('spec-iframe'); f.src=u.includes('/edit')?u.replace('/edit','')+'/preview':u; f.style.display='block'; document.getElementById('spec-empty').style.display='none'; if(!specOpen) toggleSpec(); }
+function loadSpec(save=true) {
+  const u=document.getElementById('spec-url').value.trim(); if(!u) return;
+  const f=document.getElementById('spec-iframe');
+  f.src=u.includes('/edit')?u.replace('/edit','')+'/preview':u;
+  f.style.display='block'; document.getElementById('spec-empty').style.display='none';
+  if(!specOpen) toggleSpec();
+  if(save && currentScreen && currentScreen!=='__unassigned__') {
+    screens[currentScreen].specUrl=u;
+    sb.from('screens').update({spec_url:u}).eq('id',currentScreen);
+  }
+}
 function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
 async function submitQ() {
   const q=document.getElementById('compose-q').value.trim();
@@ -955,7 +992,7 @@ async function init() {
   const {data:sData, error:sErr} = await sb.from('screens').select('*').order('sort_order').order('created_at');
   if (sErr) console.error('screens 로드 실패:', sErr);
   (sData||[]).forEach(row => {
-    screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[]};
+    screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[], figmaUrl:row.figma_url||'', specUrl:row.spec_url||''};
     screenOrder.push(row.id);
   });
   const {data:qData, error:qErr} = await sb.from('qa_items').select('*').order('created_at', {ascending:false});
