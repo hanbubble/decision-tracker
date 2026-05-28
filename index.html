@@ -84,6 +84,9 @@
   .sb-item { display: flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 17px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
   .sb-item:hover { background: var(--surface2); color: var(--text); }
   .sb-item.active { background: var(--accent3); color: var(--accent); border-left-color: var(--accent); }
+  .sb-item[draggable="true"] { cursor: grab; }
+  .sb-item.dragging { opacity: 0.35; pointer-events: none; }
+  .sb-item.drag-over { border-top: 2px solid var(--accent); }
   .sb-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.4; flex-shrink: 0; }
   .sb-count { margin-left: auto; font-size: 14px; background: var(--tag-bg); border-radius: 8px; padding: 1px 5px; color: var(--text3); }
   .sb-item.active .sb-count { background: var(--accent2); color: var(--accent); }
@@ -430,6 +433,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_WPM-JkBAGI5hbOVF7do_Fw_d09RaU_S';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const screens = {};
+let screenOrder = [];
+let dragSrcKey = null;
 
 const qaData = {};
 
@@ -756,6 +761,36 @@ function selectScreen(el,key) {
   }
 }
 function activateSb(el) { document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); }
+
+function sbDragStart(e, key) {
+  dragSrcKey = key;
+  setTimeout(() => e.target.classList.add('dragging'), 0);
+  e.dataTransfer.effectAllowed = 'move';
+}
+function sbDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function sbDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function sbDragEnd(e) {
+  document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+  dragSrcKey = null;
+}
+function sbDrop(e, targetKey) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragSrcKey || dragSrcKey === targetKey) return;
+  const si = screenOrder.indexOf(dragSrcKey), ti = screenOrder.indexOf(targetKey);
+  screenOrder.splice(si, 1);
+  screenOrder.splice(ti, 0, dragSrcKey);
+  renderSidebarScreens();
+  saveScreenOrder();
+}
+async function saveScreenOrder() {
+  await Promise.all(screenOrder.map((key, idx) => sb.from('screens').update({sort_order: idx}).eq('id', key)));
+}
 function loadFigma() { const u=document.getElementById('figma-url').value.trim(); if(!u) return; const f=document.getElementById('figma-iframe'); f.src='https://www.figma.com/embed?embed_host=share&url='+encodeURIComponent(u); f.style.display='block'; document.getElementById('figma-ph').style.display='none'; }
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
 function loadSpec() { const u=document.getElementById('spec-url').value.trim(); if(!u) return; const f=document.getElementById('spec-iframe'); f.src=u.includes('/edit')?u.replace('/edit','')+'/preview':u; f.style.display='block'; document.getElementById('spec-empty').style.display='none'; if(!specOpen) toggleSpec(); }
@@ -782,12 +817,19 @@ function renderSidebarScreens() {
         <span class="sb-count" style="${currentScreen==='__unassigned__'?'background:rgba(96,165,250,0.15);color:var(--blue)':''}">${unassignedCount}</span>
       </div>`
     : '';
-  container.innerHTML = Object.entries(screens).map(([key, s]) =>
-    `<div class="sb-item${currentScreen===key?' active':''}" onclick="selectScreen(this,'${key}')">
+  container.innerHTML = screenOrder.filter(key=>screens[key]).map(key => {
+    const s = screens[key];
+    return `<div class="sb-item${currentScreen===key?' active':''}" draggable="true"
+      onclick="selectScreen(this,'${key}')"
+      ondragstart="sbDragStart(event,'${key}')"
+      ondragover="sbDragOver(event)"
+      ondragleave="sbDragLeave(event)"
+      ondrop="sbDrop(event,'${key}')"
+      ondragend="sbDragEnd(event)">
       <div class="sb-dot"></div>${s.name}
       <span class="sb-count">${(qaData[key]||[]).length}</span>
-    </div>`
-  ).join('') + unassignedItem;
+    </div>`;
+  }).join('') + unassignedItem;
 }
 
 // 모달 열기 (key 있으면 편집 모드)
@@ -858,9 +900,10 @@ async function saveScreen() {
     if (error) { alert('저장 실패: ' + error.message); return; }
     key = editingKey;
   } else {
-    const {data:row, error} = await sb.from('screens').insert(payload).select().single();
+    const {data:row, error} = await sb.from('screens').insert({...payload, sort_order: screenOrder.length}).select().single();
     if (error) { alert('저장 실패: ' + error.message); return; }
     key = row.id;
+    screenOrder.push(key);
   }
   screens[key] = {name:payload.name, purpose:payload.purpose, kpis:payload.kpis, decisions:payload.decisions, figmaFrames:payload.figma_frames, owners:payload.owners, history:screens[key]?.history||[]};
   if (!editingKey) currentScreen = key;
@@ -909,10 +952,11 @@ function formatTime(iso) {
 }
 
 async function init() {
-  const {data:sData, error:sErr} = await sb.from('screens').select('*').order('created_at');
+  const {data:sData, error:sErr} = await sb.from('screens').select('*').order('sort_order').order('created_at');
   if (sErr) console.error('screens 로드 실패:', sErr);
   (sData||[]).forEach(row => {
     screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[]};
+    screenOrder.push(row.id);
   });
   const {data:qData, error:qErr} = await sb.from('qa_items').select('*').order('created_at', {ascending:false});
   if (qErr) console.error('qa_items 로드 실패:', qErr);
