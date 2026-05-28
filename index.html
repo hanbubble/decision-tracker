@@ -857,7 +857,6 @@ function loadSpec(save=true) {
   const sheetMatch=u.match(/\/d\/([a-zA-Z0-9_-]+)/);
   const gidMatch=u.match(/[?&#]gid=([0-9]+)/);
   document.getElementById('spec-empty').style.display='none';
-  if(!specOpen) toggleSpec();
   if(sheetMatch && range) {
     const sheetId=sheetMatch[1], gid=gidMatch?gidMatch[1]:'';
     document.getElementById('spec-iframe-wrap').style.display='none';
