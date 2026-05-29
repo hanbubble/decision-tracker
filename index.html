@@ -85,8 +85,8 @@
   /* SIDEBAR */
   .sidebar { width: 200px; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
   .sb-section { padding: 10px 12px 4px; font-size: 14px; font-weight: 500; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; }
-  #sb-screens { overflow-y: auto; max-height: calc(100vh - 380px); min-height: 40px; scrollbar-width: none; }
-  #sb-screens::-webkit-scrollbar { display: none; }
+  .sb-scroll { flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: none; }
+  .sb-scroll::-webkit-scrollbar { display: none; }
   .sb-item { display: flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 17px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
   .sb-item:hover { background: var(--surface2); color: var(--text); }
   .sb-item.active { background: var(--accent3); color: var(--accent); border-left-color: var(--accent); }
@@ -101,7 +101,7 @@
   .sb-ctx-item:hover { background:var(--surface2); }
   .sb-ctx-item.danger { color:var(--red); }
   .sb-ctx-item.danger:hover { background:var(--red-bg); }
-  .sb-bottom { margin-top: auto; border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .sb-bottom { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; }
   .link-label { font-size: 14px; color: var(--text3); margin-bottom: 3px; }
   .link-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); outline: none; }
   .link-input:focus { border-color: var(--accent); }
@@ -305,13 +305,15 @@
 
 <div class="main">
   <div class="sidebar">
-    <div class="sb-section">화면</div>
-    <div id="sb-screens"></div>
-    <button class="sb-add-btn" onclick="openScreenModal()">＋ 화면 추가</button>
-    <div class="sb-section" style="margin-top:6px">상태</div>
-    <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot"></div>전체<span class="sb-count">0</span></div>
-    <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot" style="background:var(--red)"></div>미해결<span class="sb-count">0</span></div>
-    <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot" style="background:var(--green)"></div>해결됨<span class="sb-count">0</span></div>
+    <div class="sb-scroll">
+      <div class="sb-section">화면</div>
+      <div id="sb-screens"></div>
+      <button class="sb-add-btn" onclick="openScreenModal()">＋ 화면 추가</button>
+      <div class="sb-section" style="margin-top:6px">상태</div>
+      <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot"></div>전체<span class="sb-count">0</span></div>
+      <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot" style="background:var(--red)"></div>미해결<span class="sb-count">0</span></div>
+      <div class="sb-item" onclick="activateSb(this)"><div class="sb-dot" style="background:var(--green)"></div>해결됨<span class="sb-count">0</span></div>
+    </div>
     <div class="sb-bottom">
       <div>
         <div class="link-label">피그마 링크</div>
