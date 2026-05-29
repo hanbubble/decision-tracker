@@ -94,6 +94,11 @@
   .sb-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.4; flex-shrink: 0; }
   .sb-count { margin-left: auto; font-size: 14px; background: var(--tag-bg); border-radius: 8px; padding: 1px 5px; color: var(--text3); }
   .sb-item.active .sb-count { background: var(--accent2); color: var(--accent); }
+  #sb-ctx-menu { position:fixed; background:var(--surface); border:1px solid var(--border2); border-radius:8px; padding:4px; z-index:999; display:none; min-width:100px; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+  .sb-ctx-item { padding:7px 12px; font-size:15px; border-radius:5px; cursor:pointer; }
+  .sb-ctx-item:hover { background:var(--surface2); }
+  .sb-ctx-item.danger { color:var(--red); }
+  .sb-ctx-item.danger:hover { background:var(--red-bg); }
   .sb-bottom { margin-top: auto; border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
   .link-label { font-size: 14px; color: var(--text3); margin-bottom: 3px; }
   .link-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); outline: none; }
@@ -932,6 +937,7 @@ function renderSidebarScreens() {
     const s = screens[key];
     return `<div class="sb-item${currentScreen===key?' active':''}" draggable="true" data-key="${key}"
       onclick="selectScreen(this,'${key}')"
+      oncontextmenu="showSbCtxMenu(event,'${key}')"
       ondragstart="sbDragStart(event,'${key}')"
       ondragover="sbDragOver(event)"
       ondragleave="sbDragLeave(event)"
@@ -1135,7 +1141,46 @@ function showToast(msg, type='ok') {
   clearTimeout(_toastTimer);
   _toastTimer=setTimeout(()=>t.className='',2000);
 }
+
+let _ctxKey=null;
+function showSbCtxMenu(e, key) {
+  e.preventDefault();
+  _ctxKey=key;
+  const m=document.getElementById('sb-ctx-menu');
+  m.style.display='block';
+  m.style.left=e.clientX+'px';
+  m.style.top=e.clientY+'px';
+}
+function hideSbCtxMenu() {
+  document.getElementById('sb-ctx-menu').style.display='none';
+  _ctxKey=null;
+}
+async function deleteScreen() {
+  if(!_ctxKey) return;
+  const key=_ctxKey;
+  hideSbCtxMenu();
+  if(!confirm(`'${screens[key]?.name}' 화면을 삭제할까요? Q&A도 함께 삭제됩니다.`)) return;
+  await sb.from('qa_items').delete().eq('screen_id', key);
+  await sb.from('screens').delete().eq('id', key);
+  delete screens[key];
+  delete qaData[key];
+  screenOrder.splice(screenOrder.indexOf(key), 1);
+  if(currentScreen===key) {
+    currentScreen=null;
+    document.getElementById('screen-badge').textContent='';
+    document.getElementById('screen-info-content').innerHTML='';
+    document.getElementById('rp-save-bar').style.display='none';
+    loadScreenLinks(null);
+  }
+  renderSidebarScreens();
+  renderQaList(currentQaTab);
+  showToast('화면이 삭제됐어요');
+}
+document.addEventListener('click', ()=>hideSbCtxMenu());
 </script>
 <div id="save-toast"></div>
+<div id="sb-ctx-menu">
+  <div class="sb-ctx-item danger" onclick="deleteScreen()">삭제</div>
+</div>
 </body>
 </html>
