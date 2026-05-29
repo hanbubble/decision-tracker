@@ -661,6 +661,7 @@ function showDetail(id) {
     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       ${statusLabel}
       <span style="font-size:13px;color:var(--text3);">${srcLabel} · ${d.time}</span>
+      ${d.sourceUrl?`<a href="${d.sourceUrl}" target="_blank" style="font-size:13px;color:var(--accent);text-decoration:none;padding:2px 7px;border:1px solid rgba(232,201,126,0.3);border-radius:4px;">↗ 원본 보기</a>`:''}
     </div>
     <button class="modal-close" onclick="closeDetail()">✕</button>`;
 
@@ -1106,7 +1107,7 @@ async function init() {
     const k = row.screen_id || '__unassigned__';
     if (!qaData[k]) qaData[k] = [];
     const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer, created_at:row.created_at}] : []);
-    qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, time:formatTime(row.created_at), itemType:row.item_type||'qa'});
+    qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, sourceUrl:row.source_url||'', time:formatTime(row.created_at), itemType:row.item_type||'qa'});
   });
   searchIndex = buildIndex();
   sb.channel('realtime-qa')
