@@ -178,6 +178,10 @@
   .reconsider-icon { color: var(--red); font-size: 15px; margin-top: 2px; flex-shrink: 0; }
   .owner-list { display: flex; gap: 6px; flex-wrap: wrap; }
   .owner-item { display: flex; align-items: center; gap: 5px; padding: 4px 7px; background: var(--surface2); border-radius: 5px; border: 1px solid var(--border); }
+  .history-list { display:flex; flex-direction:column; gap:5px; }
+  .history-item { display:flex; gap:8px; align-items:flex-start; padding:6px 8px; background:var(--surface2); border-radius:5px; border-left:2px solid var(--border2); }
+  .history-date { font-size:13px; color:var(--text3); white-space:nowrap; padding-top:1px; flex-shrink:0; }
+  .history-content { font-size:15px; color:var(--text); line-height:1.5; white-space:pre-wrap; }
   .owner-avatar { width: 18px; height: 18px; border-radius: 50%; background: var(--accent2); border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--accent); font-weight: 500; }
   .owner-name { font-size: 15px; color: var(--text2); }
   .owner-role { font-size: 15px; color: var(--text3); }
@@ -567,7 +571,8 @@ function renderScreenInfo(key) {
     <div class="info-section"><div class="info-label">핵심 KPI</div><div class="kpi-list">${(s.kpis||[]).map(k=>`<div class="kpi-item"><div class="kpi-name">${k.name}</div><div class="kpi-value">${k.value}</div><div class="kpi-trend">${k.trend}</div></div>`).join('')}</div></div>
     <div class="info-section"><div class="info-label">결정사항</div><div class="decision-list">${(s.decisions||[]).map(d=>`<div class="decision-item"><div class="decision-q">${d.q}</div><div class="decision-why">${d.why}</div>${d.reconsider?`<div class="decision-reconsider">재논의 조건: ${d.reconsider}</div>`:''}</div>`).join('')}</div></div>
 
-    <div class="info-section"><div class="info-label">담당자</div><div class="owner-list">${(s.owners||[]).map(o=>`<div class="owner-item"><div class="owner-avatar">${o.name?o.name[0]:''}</div><div><div class="owner-name">${o.name}</div><div class="owner-role">${o.role}</div></div></div>`).join('')}</div></div>`;
+    <div class="info-section"><div class="info-label">담당자</div><div class="owner-list">${(s.owners||[]).map(o=>`<div class="owner-item"><div class="owner-avatar">${o.name?o.name[0]:''}</div><div><div class="owner-name">${o.name}</div><div class="owner-role">${o.role}</div></div></div>`).join('')}</div></div>
+    <div class="info-section"><div class="info-label">수정이력</div><div class="history-list">${(s.history||[]).map(h=>`<div class="history-item"><div class="history-date">${h.date||''}</div><div class="history-content">${h.content||''}</div></div>`).join('')}</div></div>`;
   saveBar.style.display = 'block';
   document.getElementById('rp-bar-view').style.display = 'block';
   document.getElementById('rp-bar-edit').style.display = 'none';
@@ -600,11 +605,16 @@ function activateInfoEdit() {
       <div class="info-label">담당자</div>
       <div class="mf-dynamic" id="rp-owners"></div>
       <button class="mf-add" onclick="rpAddOwnerRow()">＋ 담당자 추가</button>
+    </div>
+    <div class="rp-field-section">
+      <div class="info-label">수정이력</div>
+      <div class="mf-dynamic" id="rp-history"></div>
+      <button class="mf-add" onclick="rpAddHistoryRow()">＋ 이력 추가</button>
     </div>`;
   (s.kpis||[]).forEach(k=>rpAddKpiRow(k.name,k.value,k.trend));
   (s.decisions||[]).forEach(d=>rpAddDecisionRow(d.q,d.why,d.reconsider||''));
-
   (s.owners||[]).forEach(o=>rpAddOwnerRow(o.name,o.role));
+  (s.history||[]).forEach(h=>rpAddHistoryRow(h.date,h.content));
   document.getElementById('rp-bar-view').style.display = 'none';
   document.getElementById('rp-bar-edit').style.display = 'flex';
 }
@@ -1042,10 +1052,11 @@ async function saveScreenFromPanel() {
     kpis: [...document.getElementById('rp-kpis').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),value:i[1].value.trim(),trend:i[2].value.trim()};}).filter(k=>k.name),
     decisions: [...document.getElementById('rp-decisions').querySelectorAll('.mf-row')].map(r=>{const t=r.querySelectorAll('textarea');return{q:t[0].value.trim(),why:t[1].value.trim(),reconsider:t[2]?t[2].value.trim():''}}).filter(d=>d.q),
     owners: [...document.getElementById('rp-owners').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),role:i[1].value.trim()};}).filter(o=>o.name),
+    history: [...document.getElementById('rp-history').querySelectorAll('.mf-row')].map(r=>{const inp=r.querySelector('input');const ta=r.querySelector('textarea');return{date:inp?inp.value.trim():'',content:ta?ta.value.trim():''};}).filter(h=>h.content),
   };
   const {error} = await sb.from('screens').update(payload).eq('id', currentScreen);
   if (error) { alert('저장 실패: ' + error.message); return; }
-  screens[currentScreen] = {...screens[currentScreen], name:payload.name, purpose:payload.purpose, kpis:payload.kpis, decisions:payload.decisions, figmaFrames:payload.figma_frames, owners:payload.owners};
+  screens[currentScreen] = {...screens[currentScreen], name:payload.name, purpose:payload.purpose, kpis:payload.kpis, decisions:payload.decisions, owners:payload.owners, history:payload.history};
   renderSidebarScreens();
   document.getElementById('screen-badge').textContent = name;
   renderScreenInfo(currentScreen);
@@ -1057,6 +1068,12 @@ function rpAddKpiRow(name='',value='',trend=''){const row=document.createElement
 function rpAddDecisionRow(q='',why='',reconsider=''){const row=document.createElement('div');row.className='mf-row';row.style.cssText='flex-direction:column;gap:5px;position:relative';row.innerHTML=`<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><textarea class="mf-input" placeholder="결정 내용" style="min-height:60px;resize:none;width:100%">${q}</textarea><textarea class="mf-input" placeholder="이유" style="min-height:60px;resize:none;width:100%">${why}</textarea><textarea class="mf-input" placeholder="재논의 조건 (선택)" style="min-height:60px;resize:none;width:100%">${reconsider}</textarea>`;document.getElementById('rp-decisions').appendChild(row);}
 function rpAddFrameRow(val=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="피그마 프레임명" value="${val}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-frames').appendChild(row);}
 function rpAddOwnerRow(name='',role=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="이름" value="${name}"><input class="mf-input" placeholder="팀" value="${role}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-owners').appendChild(row);}
+function rpAddHistoryRow(date='',content=''){
+  const today=date||new Date().toISOString().slice(0,10);
+  const row=document.createElement('div');row.className='mf-row';row.style.cssText='flex-direction:column;gap:5px;position:relative';
+  row.innerHTML=`<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><input class="mf-input" placeholder="날짜 (예: 2025-05-29)" value="${today}" style="width:160px"><textarea class="mf-input" placeholder="변경 내용" style="min-height:52px;resize:none;width:100%">${content}</textarea>`;
+  document.getElementById('rp-history').appendChild(row);
+}
 
 function formatTime(iso) {
   if (!iso) return '';
