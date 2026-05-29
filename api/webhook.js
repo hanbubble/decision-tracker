@@ -9,51 +9,32 @@ const SLACK_HEADERS = () => ({
   Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
 });
 
-// 채널 메시지 가져오기 (스레드 답글 제외)
-async function fetchChannelMessage(channel, ts) {
-  const res = await fetch(
-    `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=true&limit=1`,
-    { headers: SLACK_HEADERS() }
-  );
-  const data = await res.json();
-  if (!data.ok) console.error('Slack history error:', data.error, '| needed:', data.needed, '| provided:', data.provided);
-  return data.messages?.[0] || null;
-}
-
-// 채널 메시지 + 스레드 답글 모두 커버
+// 채널 메시지 + 스레드 답글 모두 커버 (reactions.get 기반)
 async function fetchAnyMessage(channel, ts) {
-  // 1. 직접 채널 메시지인지 확인
-  const r1 = await fetch(
-    `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=true&limit=1`,
+  // reactions.get으로 반응 달린 메시지 직접 조회 (thread_ts 포함)
+  const r = await fetch(
+    `https://slack.com/api/reactions.get?channel=${channel}&timestamp=${ts}&full=true`,
     { headers: SLACK_HEADERS() }
   );
-  const d1 = await r1.json();
-  if (!d1.ok) console.error('Slack history error:', d1.error, '| needed:', d1.needed);
-  const direct = d1.messages?.find(m => m.ts === ts);
-  if (direct) return direct;
+  const d = await r.json();
+  if (!d.ok) {
+    console.error('reactions.get error:', d.error, '| needed:', d.needed);
+    return null;
+  }
+  const msg = d.message;
+  if (!msg) return null;
 
-  // 2. 스레드 답글 탐색: 최근 20개 채널 메시지 중 스레드가 있는 것을 후보로
+  // 채널 메시지이거나 스레드 루트면 바로 반환
+  if (!msg.thread_ts || msg.thread_ts === msg.ts) return msg;
+
+  // 스레드 답글이면 conversations.replies로 정확한 메시지 가져오기
   const r2 = await fetch(
-    `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=false&limit=20`,
+    `https://slack.com/api/conversations.replies?channel=${channel}&ts=${msg.thread_ts}&latest=${ts}&inclusive=true&limit=1`,
     { headers: SLACK_HEADERS() }
   );
   const d2 = await r2.json();
-  const candidates = (d2.messages || []).filter(m => m.reply_count > 0);
-  console.log('[fetch] thread candidates:', candidates.map(m => m.ts).join(','));
-
-  for (const parent of candidates) {
-    const r3 = await fetch(
-      `https://slack.com/api/conversations.replies?channel=${channel}&ts=${parent.ts}`,
-      { headers: SLACK_HEADERS() }
-    );
-    const d3 = await r3.json();
-    if (!d3.ok) continue;
-    const found = d3.messages?.find(m => m.ts === ts);
-    if (found) { console.log('[fetch] found in thread:', parent.ts); return found; }
-  }
-
-  console.log('[fetch] not found in any thread');
-  return null;
+  if (!d2.ok) { console.error('replies error:', d2.error); return msg; }
+  return d2.messages?.find(m => m.ts === ts) || msg;
 }
 
 module.exports = async function handler(req, res) {
