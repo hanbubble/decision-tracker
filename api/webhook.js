@@ -22,25 +22,37 @@ async function fetchChannelMessage(channel, ts) {
 
 // 채널 메시지 + 스레드 답글 모두 커버
 async function fetchAnyMessage(channel, ts) {
-  const parent = await fetchChannelMessage(channel, ts);
-  console.log('[fetch] parent:', parent?.ts, 'target ts:', ts, 'match:', parent?.ts === ts);
+  // 1. 직접 채널 메시지인지 확인
+  const r1 = await fetch(
+    `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=true&limit=1`,
+    { headers: SLACK_HEADERS() }
+  );
+  const d1 = await r1.json();
+  if (!d1.ok) console.error('Slack history error:', d1.error, '| needed:', d1.needed);
+  const direct = d1.messages?.find(m => m.ts === ts);
+  if (direct) return direct;
 
-  // ts가 정확히 일치 → 채널 메시지
-  if (parent?.ts === ts) return parent;
+  // 2. 스레드 답글 탐색: 최근 20개 채널 메시지 중 스레드가 있는 것을 후보로
+  const r2 = await fetch(
+    `https://slack.com/api/conversations.history?channel=${channel}&latest=${ts}&inclusive=false&limit=20`,
+    { headers: SLACK_HEADERS() }
+  );
+  const d2 = await r2.json();
+  const candidates = (d2.messages || []).filter(m => m.reply_count > 0);
+  console.log('[fetch] thread candidates:', candidates.map(m => m.ts).join(','));
 
-  // ts 불일치 → 스레드 답글. parent가 루트 메시지
-  if (parent) {
-    const res = await fetch(
+  for (const parent of candidates) {
+    const r3 = await fetch(
       `https://slack.com/api/conversations.replies?channel=${channel}&ts=${parent.ts}`,
       { headers: SLACK_HEADERS() }
     );
-    const data = await res.json();
-    console.log('[fetch] replies ok:', data.ok, 'count:', data.messages?.length, 'ts list:', data.messages?.map(m=>m.ts).join(','));
-    if (!data.ok) console.error('Slack replies error:', data.error, '| needed:', data.needed);
-    return data.messages?.find(m => m.ts === ts) || null;
+    const d3 = await r3.json();
+    if (!d3.ok) continue;
+    const found = d3.messages?.find(m => m.ts === ts);
+    if (found) { console.log('[fetch] found in thread:', parent.ts); return found; }
   }
 
-  console.log('[fetch] parent is null — no message found');
+  console.log('[fetch] not found in any thread');
   return null;
 }
 
