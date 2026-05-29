@@ -24,5 +24,6 @@ module.exports = async function handler(req, res) {
   }
 
   console.log('Slack app installed to workspace:', data.team?.name);
+  console.log('BOT_TOKEN:', data.access_token);
   return res.status(200).send('<h2>✅ 슬랙 앱 설치 완료!</h2><p>이 창을 닫아도 됩니다.</p>');
 };
