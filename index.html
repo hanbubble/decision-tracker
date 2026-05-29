@@ -863,7 +863,11 @@ function loadFigma(save=true) {
     if(!lk[currentScreen]) lk[currentScreen]={};
     lk[currentScreen].figmaUrl=u;
     localStorage.setItem('screenLinks',JSON.stringify(lk));
-    sb.from('screens').update({figma_url:u}).eq('id',currentScreen)
+    const nodeIdMatch=u.match(/[?&]node-id=([^&#]+)/);
+    const figmaNodeId=nodeIdMatch ? decodeURIComponent(nodeIdMatch[1]).replace(/-/g,':') : null;
+    const updatePayload={figma_url:u};
+    if(figmaNodeId) { updatePayload.figma_node_id=figmaNodeId; screens[currentScreen].figmaNodeId=figmaNodeId; }
+    sb.from('screens').update(updatePayload).eq('id',currentScreen)
       .then(({error})=>{ if(error){console.error('figma_url 저장 실패:',error);showToast('저장 실패: '+error.message,'err');}else{showToast('피그마 링크 저장됨');} });
   }
 }
