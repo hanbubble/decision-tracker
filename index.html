@@ -630,7 +630,7 @@ function cancelInfoEdit() {
 
 function renderQaList(tab) {
   const items = (qaData[currentScreen]||[]).filter(d=>tab==='notice'?d.itemType==='notice':(d.itemType!=='notice')&&(tab==='all'||d.status===tab));
-  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail('${d.id}')"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${d.q}</div></div>${(d.answers&&d.answers.length)?d.answers.map(ans=>`<div class="qa-a-preview">${ans.text.length>120?ans.text.slice(0,120)+'…':ans.text}</div>`).join(''):''}<div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':d.source==='figma'?'피그마':'직접입력'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
+  document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail('${d.id}')"><div class="qa-card-top"><div class="qa-status ${d.status}">${d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${nl2br(d.q)}</div></div>${(d.answers&&d.answers.length)?d.answers.map(ans=>`<div class="qa-a-preview">${nl2br(ans.text.length>120?ans.text.slice(0,120)+'…':ans.text)}</div>`).join(''):''}<div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':d.source==='figma'?'피그마':'직접입력'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
   document.getElementById('qa-count').textContent = (qaData[currentScreen]||[]).length;
 }
 
@@ -668,13 +668,13 @@ function showDetail(id) {
   document.getElementById('qm-body').innerHTML = `
     <div>
       <div class="mf-label">질문</div>
-      <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${d.q}</div>
+      <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${nl2br(d.q)}</div>
     </div>
     <div>
       <div class="mf-label">답변 ${d.answers&&d.answers.length>1?`(${d.answers.length}개)`:''}</div>
       ${d.answers&&d.answers.length
         ? d.answers.map((ans,i)=>`<div style="margin-bottom:6px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">${d.answers.length>1?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px;">답변 ${i+1}</div>`:''}
-          <div style="font-size:15px;color:var(--text2);line-height:1.6;">${ans.text}</div></div>`).join('')
+          <div style="font-size:15px;color:var(--text2);line-height:1.6;">${nl2br(ans.text)}</div></div>`).join('')
         : `<div style="font-size:15px;color:var(--text3);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;min-height:60px;">아직 답변이 없습니다.</div>`}
     </div>
     <div>
@@ -1085,6 +1085,9 @@ function rpAddHistoryRow(date='',content=''){
   document.getElementById('rp-history').appendChild(row);
 }
 
+function nl2br(text) {
+  return String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
 function formatTime(iso) {
   if (!iso) return '';
   const d = new Date(iso), now = new Date(), diff = now - d;
