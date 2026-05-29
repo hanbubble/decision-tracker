@@ -118,6 +118,34 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // ── 🔖 전달사항 등록 ────────────────────────────────────────────────
+    if (event.reaction === 'bookmark') {
+      const { data: dup } = await supabase.from('qa_items').select('id').eq('slack_channel', channel).eq('slack_ts', ts).limit(1);
+      if (dup && dup.length > 0) {
+        console.log('[Notice] Already exists for ts:', ts);
+      } else {
+        let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
+        try {
+          const msg = await fetchAnyMessage(channel, ts);
+          if (msg?.text) question = msg.text;
+        } catch (e) {
+          console.error('[Notice] Slack fetch error:', e);
+        }
+        const { error } = await supabase.from('qa_items').insert({
+          question,
+          status: 'open',
+          item_type: 'notice',
+          source: 'slack',
+          slack_channel: channel,
+          slack_ts: ts,
+          source_author: event.user,
+          source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
+        });
+        if (error) console.error('[Notice] Insert error:', error);
+        else console.log('[Notice] Saved:', question.slice(0, 60));
+      }
+    }
+
     // ── 🅰️ 답변 업데이트 ─────────────────────────────────────────────
     if (event.reaction === 'a') {
       let answerText = '';
