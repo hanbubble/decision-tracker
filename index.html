@@ -556,7 +556,7 @@ function renderScreenInfo(key) {
     <div class="info-section"><div class="info-label">화면 목적</div><div class="info-value primary">${s.purpose||''}</div></div>
     <div class="info-section"><div class="info-label">핵심 KPI</div><div class="kpi-list">${(s.kpis||[]).map(k=>`<div class="kpi-item"><div class="kpi-name">${k.name}</div><div class="kpi-value">${k.value}</div><div class="kpi-trend">${k.trend}</div></div>`).join('')}</div></div>
     <div class="info-section"><div class="info-label">결정사항</div><div class="decision-list">${(s.decisions||[]).map(d=>`<div class="decision-item"><div class="decision-q">${d.q}</div><div class="decision-why">${d.why}</div>${d.reconsider?`<div class="decision-reconsider">재논의 조건: ${d.reconsider}</div>`:''}</div>`).join('')}</div></div>
-    <div class="info-section"><div class="info-label">피그마 프레임</div><div class="figma-chips">${(s.figmaFrames||[]).map(f=>`<div class="figma-chip"><div class="figma-chip-dot"></div>${f}</div>`).join('')}</div></div>
+
     <div class="info-section"><div class="info-label">담당자</div><div class="owner-list">${(s.owners||[]).map(o=>`<div class="owner-item"><div class="owner-avatar">${o.name?o.name[0]:''}</div><div><div class="owner-name">${o.name}</div><div class="owner-role">${o.role}</div></div></div>`).join('')}</div></div>`;
   saveBar.style.display = 'block';
   document.getElementById('rp-bar-view').style.display = 'block';
@@ -585,11 +585,7 @@ function activateInfoEdit() {
       <div class="mf-dynamic" id="rp-decisions"></div>
       <button class="mf-add" onclick="rpAddDecisionRow()">＋ 결정사항 추가</button>
     </div>
-    <div class="rp-field-section">
-      <div class="info-label">피그마 프레임</div>
-      <div class="mf-dynamic" id="rp-frames"></div>
-      <button class="mf-add" onclick="rpAddFrameRow()">＋ 프레임 추가</button>
-    </div>
+
     <div class="rp-field-section">
       <div class="info-label">담당자</div>
       <div class="mf-dynamic" id="rp-owners"></div>
@@ -597,7 +593,7 @@ function activateInfoEdit() {
     </div>`;
   (s.kpis||[]).forEach(k=>rpAddKpiRow(k.name,k.value,k.trend));
   (s.decisions||[]).forEach(d=>rpAddDecisionRow(d.q,d.why,d.reconsider||''));
-  (s.figmaFrames||[]).forEach(f=>rpAddFrameRow(f));
+
   (s.owners||[]).forEach(o=>rpAddOwnerRow(o.name,o.role));
   document.getElementById('rp-bar-view').style.display = 'none';
   document.getElementById('rp-bar-edit').style.display = 'flex';
