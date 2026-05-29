@@ -1041,7 +1041,6 @@ async function saveScreenFromPanel() {
     purpose: document.getElementById('rp-purpose').value.trim(),
     kpis: [...document.getElementById('rp-kpis').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),value:i[1].value.trim(),trend:i[2].value.trim()};}).filter(k=>k.name),
     decisions: [...document.getElementById('rp-decisions').querySelectorAll('.mf-row')].map(r=>{const t=r.querySelectorAll('textarea');return{q:t[0].value.trim(),why:t[1].value.trim(),reconsider:t[2]?t[2].value.trim():''}}).filter(d=>d.q),
-    figma_frames: [...document.getElementById('rp-frames').querySelectorAll('.mf-row')].map(r=>r.querySelector('input').value.trim()).filter(Boolean),
     owners: [...document.getElementById('rp-owners').querySelectorAll('.mf-row')].map(r=>{const i=r.querySelectorAll('input');return{name:i[0].value.trim(),role:i[1].value.trim()};}).filter(o=>o.name),
   };
   const {error} = await sb.from('screens').update(payload).eq('id', currentScreen);
