@@ -22,6 +22,10 @@
 
   /* NAV */
   .topnav { height: 48px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; background: var(--surface); }
+  #save-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--surface); border:1px solid var(--border2); border-radius:8px; padding:8px 16px; font-size:14px; color:var(--text2); opacity:0; pointer-events:none; transition:opacity 0.2s,transform 0.2s; z-index:999; }
+  #save-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #save-toast.ok { border-color:rgba(74,222,128,0.4); color:var(--green); }
+  #save-toast.err { border-color:rgba(248,113,113,0.4); color:var(--red); }
   .logo { font-family: 'Instrument Serif', serif; font-size: 23px; color: var(--accent); flex-shrink: 0; }
   .nav-sep { width: 1px; height: 16px; background: var(--border2); flex-shrink: 0; }
   .project-pill { display: flex; align-items: center; gap: 5px; font-size: 17px; color: var(--text2); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; flex-shrink: 0; }
@@ -840,11 +844,12 @@ function loadFigma(save=true) {
   f.style.display='block'; document.getElementById('figma-ph').style.display='none';
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     screens[currentScreen].figmaUrl=u;
-    sb.from('screens').update({figma_url:u}).eq('id',currentScreen).then(({error})=>{ if(error) console.error('figma_url 저장 실패:', error); });
     const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
     if(!lk[currentScreen]) lk[currentScreen]={};
     lk[currentScreen].figmaUrl=u;
     localStorage.setItem('screenLinks',JSON.stringify(lk));
+    sb.from('screens').update({figma_url:u}).eq('id',currentScreen)
+      .then(({error})=>{ if(error){console.error('figma_url 저장 실패:',error);showToast('저장 실패: '+error.message,'err');}else{showToast('피그마 링크 저장됨');} });
   }
 }
 function openFigma() { const u=document.getElementById('figma-url').value.trim(); if(u) window.open(u,'_blank'); }
@@ -892,11 +897,12 @@ function loadSpec(save=true) {
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     const saveVal = u + (range ? '#range='+range : '');
     screens[currentScreen].specUrl=saveVal;
-    sb.from('screens').update({spec_url:saveVal}).eq('id',currentScreen).then(({error})=>{ if(error) console.error('spec_url 저장 실패:', error); });
     const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
     if(!lk[currentScreen]) lk[currentScreen]={};
     lk[currentScreen].specUrl=saveVal;
     localStorage.setItem('screenLinks',JSON.stringify(lk));
+    sb.from('screens').update({spec_url:saveVal}).eq('id',currentScreen)
+      .then(({error})=>{ if(error){console.error('spec_url 저장 실패:',error);showToast('저장 실패: '+error.message,'err');}else{showToast('명세서 링크 저장됨');} });
   }
 }
 function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
@@ -1121,6 +1127,15 @@ init();
 document.getElementById('qa-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDetail();
 });
+
+let _toastTimer=null;
+function showToast(msg, type='ok') {
+  const t=document.getElementById('save-toast');
+  t.textContent=msg; t.className='show '+type;
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>t.className='',2000);
+}
 </script>
+<div id="save-toast"></div>
 </body>
 </html>
