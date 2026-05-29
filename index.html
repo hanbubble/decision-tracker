@@ -85,7 +85,8 @@
   /* SIDEBAR */
   .sidebar { width: 200px; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
   .sb-section { padding: 10px 12px 4px; font-size: 14px; font-weight: 500; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; }
-  #sb-screens { overflow-y: auto; max-height: calc(100vh - 380px); min-height: 40px; }
+  #sb-screens { overflow-y: auto; max-height: calc(100vh - 380px); min-height: 40px; scrollbar-width: none; }
+  #sb-screens::-webkit-scrollbar { display: none; }
   .sb-item { display: flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 17px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; transition: all 0.1s; }
   .sb-item:hover { background: var(--surface2); color: var(--text); }
   .sb-item.active { background: var(--accent3); color: var(--accent); border-left-color: var(--accent); }
