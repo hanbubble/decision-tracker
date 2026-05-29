@@ -16,7 +16,7 @@ async function fetchChannelMessage(channel, ts) {
     { headers: SLACK_HEADERS() }
   );
   const data = await res.json();
-  if (!data.ok) console.error('Slack history error:', data.error);
+  if (!data.ok) console.error('Slack history error:', data.error, '| needed:', data.needed, '| provided:', data.provided);
   return data.messages?.[0] || null;
 }
 
