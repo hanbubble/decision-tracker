@@ -191,24 +191,114 @@ module.exports = async function handler(req, res) {
 
   // ── Figma ──────────────────────────────────────────────────────────────
   if (source === 'figma') {
-    const { event_type, comment } = body;
-    if (event_type === 'COMMENT') {
-      const text = comment?.message || '';
-      if (text.includes('@loopnote')) {
-        try {
-          await supabase.from('qa_items').insert({
-            question: text.replace(/@loopnote/g, '').trim(),
-            status: 'open',
-            source: 'figma',
-            figma_comment_id: comment?.id,
-            figma_node_id: comment?.file_key,
-            source_author: comment?.user?.handle,
-          });
-        } catch (e) {
-          console.error('Supabase insert error:', e);
-        }
+    const { event_type, comment, file_key } = body;
+    if (event_type !== 'FILE_COMMENT' && event_type !== 'COMMENT') {
+      return res.status(200).json({ ok: true });
+    }
+
+    const msg = comment?.message || '';
+    const nodeId = comment?.client_meta?.node_id || null;
+    const parentId = comment?.parent_id || null;
+    const commentId = comment?.id;
+
+    async function findScreenByNode(nid) {
+      if (!nid) return null;
+      const { data } = await supabase.from('screens').select('id').eq('figma_node_id', nid).limit(1);
+      return data?.[0]?.id || null;
+    }
+
+    async function fetchFigmaComments(fileKey) {
+      const token = process.env.FIGMA_ACCESS_TOKEN;
+      if (!token) { console.error('[Figma] FIGMA_ACCESS_TOKEN not set'); return []; }
+      const r = await fetch(`https://api.figma.com/v1/files/${fileKey}/comments`, {
+        headers: { 'X-Figma-Token': token },
+      });
+      const d = await r.json();
+      return d.comments || [];
+    }
+
+    // Case 1: 최상위 코멘트 → 자동 등록 + 화면 매핑
+    if (!parentId && nodeId) {
+      const { data: dup } = await supabase.from('qa_items').select('id').eq('figma_comment_id', commentId).limit(1);
+      if (!dup?.length) {
+        const screenId = await findScreenByNode(nodeId);
+        const { error } = await supabase.from('qa_items').insert({
+          question: msg,
+          status: 'open',
+          source: 'figma',
+          figma_comment_id: commentId,
+          figma_node_id: nodeId,
+          source_author: comment?.user?.handle,
+          ...(screenId ? { screen_id: screenId } : {}),
+        });
+        if (error) console.error('[Figma] Insert error:', error);
+        else console.log('[Figma] New QA:', msg.slice(0, 60), screenId ? `→ screen ${screenId}` : '(no screen)');
       }
     }
+
+    // Case 2: 답글에 @loopnote 태그 → 부모 코멘트 + 전체 스레드 수집
+    if (parentId && msg.includes('@loopnote')) {
+      try {
+        const allComments = await fetchFigmaComments(file_key);
+        const parent = allComments.find(c => c.id === parentId);
+        if (!parent) {
+          console.error('[Figma] Parent comment not found:', parentId);
+          return res.status(200).json({ ok: true });
+        }
+
+        const replies = allComments
+          .filter(c => c.parent_id === parentId)
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+        const parentNodeId = parent.client_meta?.node_id || null;
+        const screenId = await findScreenByNode(parentNodeId);
+
+        const answersList = replies.map(r => ({
+          text: r.message,
+          author: r.user?.handle,
+          figma_comment_id: r.id,
+          created_at: r.created_at,
+        }));
+
+        const { data: dup } = await supabase.from('qa_items').select('id').eq('figma_comment_id', parent.id).limit(1);
+
+        if (!dup?.length) {
+          const { error } = await supabase.from('qa_items').insert({
+            question: parent.message,
+            status: replies.length > 0 ? 'resolved' : 'open',
+            source: 'figma',
+            figma_comment_id: parent.id,
+            figma_node_id: parentNodeId,
+            source_author: parent.user?.handle,
+            answers: answersList,
+            answer: replies[replies.length - 1]?.message || null,
+            ...(screenId ? { screen_id: screenId } : {}),
+          });
+          if (error) console.error('[Figma] Thread insert error:', error);
+          else console.log('[Figma] Thread collected:', parent.message.slice(0, 60), `(${replies.length} replies)`);
+        } else {
+          // 이미 존재 → 새 답글만 추가
+          const existingId = dup[0].id;
+          const { data: existingRow } = await supabase.from('qa_items').select('answers').eq('id', existingId).single();
+          const currentAnswers = Array.isArray(existingRow?.answers) ? existingRow.answers : [];
+          const savedIds = new Set(currentAnswers.map(a => a.figma_comment_id));
+          const newReplies = answersList.filter(a => !savedIds.has(a.figma_comment_id));
+          if (newReplies.length > 0) {
+            const updated = [...currentAnswers, ...newReplies];
+            const { error } = await supabase.from('qa_items')
+              .update({ answers: updated, answer: replies[replies.length - 1]?.message })
+              .eq('id', existingId);
+            if (error) console.error('[Figma] Thread update error:', error);
+            else console.log('[Figma] Thread updated with', newReplies.length, 'new replies');
+          } else {
+            console.log('[Figma] Thread already up to date');
+          }
+        }
+      } catch (e) {
+        console.error('[Figma] Thread collection error:', e);
+      }
+    }
+
     return res.status(200).json({ ok: true });
   }
 
