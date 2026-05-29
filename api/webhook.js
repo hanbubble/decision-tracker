@@ -23,6 +23,7 @@ async function fetchChannelMessage(channel, ts) {
 // 채널 메시지 + 스레드 답글 모두 커버
 async function fetchAnyMessage(channel, ts) {
   const parent = await fetchChannelMessage(channel, ts);
+  console.log('[fetch] parent:', parent?.ts, 'target ts:', ts, 'match:', parent?.ts === ts);
 
   // ts가 정확히 일치 → 채널 메시지
   if (parent?.ts === ts) return parent;
@@ -34,10 +35,12 @@ async function fetchAnyMessage(channel, ts) {
       { headers: SLACK_HEADERS() }
     );
     const data = await res.json();
-    if (!data.ok) console.error('Slack replies error:', data.error);
+    console.log('[fetch] replies ok:', data.ok, 'count:', data.messages?.length, 'ts list:', data.messages?.map(m=>m.ts).join(','));
+    if (!data.ok) console.error('Slack replies error:', data.error, '| needed:', data.needed);
     return data.messages?.find(m => m.ts === ts) || null;
   }
 
+  console.log('[fetch] parent is null — no message found');
   return null;
 }
 
