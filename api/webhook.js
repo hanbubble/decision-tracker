@@ -77,7 +77,31 @@ module.exports = async function handler(req, res) {
           console.error('Slack fetch error:', e);
         }
 
-        const { error } = await supabase.from('qa_items').insert({
+        // 첫 줄에서 화면명 추출: "[... | #01.홈화면 ]" 형식에서 # 뒤 텍스트
+        let screenId = null;
+        const firstLine = question.split('\n')[0];
+        const screenMatch = firstLine.match(/#([^\]|]+)/);
+        if (screenMatch) {
+          const screenName = screenMatch[1].trim();
+          console.log('[Q] Extracted screen name:', screenName);
+          try {
+            const { data: screenRows } = await supabase
+              .from('screens')
+              .select('id')
+              .ilike('name', screenName)
+              .limit(1);
+            if (screenRows?.[0]) {
+              screenId = screenRows[0].id;
+              console.log('[Q] Mapped to screen_id:', screenId);
+            } else {
+              console.log('[Q] No screen matched for:', screenName);
+            }
+          } catch (e) {
+            console.error('[Q] Screen lookup error:', e);
+          }
+        }
+
+        const insertPayload = {
           question,
           status: 'open',
           source: 'slack',
@@ -85,9 +109,12 @@ module.exports = async function handler(req, res) {
           slack_ts: ts,
           source_author: event.user,
           source_url: `https://slack.com/archives/${channel}/p${ts?.replace('.', '')}`,
-        });
+        };
+        if (screenId) insertPayload.screen_id = screenId;
+
+        const { error } = await supabase.from('qa_items').insert(insertPayload);
         if (error) console.error('Insert error:', error);
-        else console.log('Q&A question saved:', question.slice(0, 60));
+        else console.log('Q&A question saved:', question.slice(0, 60), screenId ? `→ screen ${screenId}` : '(no screen)');
       }
     }
 
