@@ -588,12 +588,12 @@ function renderScreenInfo(key) {
   if (!key || !screens[key]) { el.innerHTML = ''; saveBar.style.display = 'none'; return; }
   const s = screens[key];
   el.innerHTML = `
-    <div class="info-section"><div class="info-label">화면 목적</div><div class="info-value primary">${s.purpose||''}</div></div>
+    <div class="info-section"><div class="info-label">화면 목적</div><div class="info-value primary">${nl2br(s.purpose||'')}</div></div>
     <div class="info-section"><div class="info-label">핵심 KPI</div><div class="kpi-list">${(s.kpis||[]).map(k=>`<div class="kpi-item"><div class="kpi-name">${k.name}</div><div class="kpi-value">${k.value}</div><div class="kpi-trend">${k.trend}</div></div>`).join('')}</div></div>
-    <div class="info-section"><div class="info-label">결정사항</div><div class="decision-list">${(s.decisions||[]).map(d=>`<div class="decision-item"><div class="decision-q">${d.q}</div><div class="decision-why">${d.why}</div>${d.reconsider?`<div class="decision-reconsider">재논의 조건: ${d.reconsider}</div>`:''}</div>`).join('')}</div></div>
+    <div class="info-section"><div class="info-label">결정사항</div><div class="decision-list">${(s.decisions||[]).map(d=>`<div class="decision-item"><div class="decision-q">${nl2br(d.q)}</div><div class="decision-why">${nl2br(d.why)}</div>${d.reconsider?`<div class="decision-reconsider">재논의 조건: ${nl2br(d.reconsider)}</div>`:''}</div>`).join('')}</div></div>
 
     <div class="info-section"><div class="info-label">담당자</div><div class="owner-list">${(s.owners||[]).map(o=>`<div class="owner-item"><div class="owner-avatar">${o.name?o.name[0]:''}</div><div><div class="owner-name">${o.name}</div><div class="owner-role">${o.role}</div></div></div>`).join('')}</div></div>
-    <div class="info-section"><div class="info-label">수정이력</div><div class="history-list">${(s.history||[]).map(h=>`<div class="history-item"><div class="history-date">${h.date||''}</div><div class="history-content">${h.content||''}</div></div>`).join('')}</div></div>`;
+    <div class="info-section"><div class="info-label">수정이력</div><div class="history-list">${(s.history||[]).map(h=>`<div class="history-item"><div class="history-date">${h.date||''}</div><div class="history-content">${nl2br(h.content||'')}</div></div>`).join('')}</div></div>`;
   saveBar.style.display = 'block';
   document.getElementById('rp-bar-view').style.display = 'block';
   document.getElementById('rp-bar-edit').style.display = 'none';
@@ -638,9 +638,6 @@ function activateInfoEdit() {
   (s.history||[]).forEach(h=>rpAddHistoryRow(h.date,h.content));
   document.getElementById('rp-bar-view').style.display = 'none';
   document.getElementById('rp-bar-edit').style.display = 'flex';
-  document.getElementById('screen-info-content').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveScreenFromPanel(); }
-  });
 }
 
 function cancelInfoEdit() {
