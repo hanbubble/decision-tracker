@@ -163,7 +163,9 @@
   .spec-empty p { font-size:17px; color:var(--text3); }
 
   /* RIGHT PANEL */
-  .right-panel { width: 440px; display: flex; flex-direction: column; background: var(--surface); flex-shrink: 0; overflow: hidden; }
+  .right-panel { width: 440px; display: flex; flex-direction: column; background: var(--surface); flex-shrink: 0; overflow: hidden; transition: width 0.25s ease; }
+  .right-panel.collapsed { width: 0; }
+  #rp-toggle { position:absolute; right:0; top:50%; transform:translateY(-50%); width:18px; height:48px; background:var(--surface2); border:1px solid var(--border); border-right:none; border-radius:6px 0 0 6px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--text3); z-index:10; }
   .rp-tabs { height: 38px; border-bottom: 1px solid var(--border); display: flex; align-items: stretch; flex-shrink: 0; }
   .rp-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 17px; font-weight: 500; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
   .rp-tab:hover { color: var(--text2); background: var(--surface2); }
@@ -343,6 +345,7 @@
   </div>
 
   <div class="center-col">
+    <button id="rp-toggle" onclick="toggleRightPanel()" title="우측 패널 접기">›</button>
     <div class="panel-header">
       <div class="panel-title">미리보기</div>
       <div class="panel-badge" id="screen-badge"></div>
@@ -1102,6 +1105,12 @@ function rpAddHistoryRow(date='',content=''){
 
 function nl2br(text) {
   return String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+function toggleRightPanel() {
+  const rp = document.querySelector('.right-panel');
+  const btn = document.getElementById('rp-toggle');
+  const collapsed = rp.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '‹' : '›';
 }
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('light');
