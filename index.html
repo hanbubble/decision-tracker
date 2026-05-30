@@ -277,7 +277,8 @@
   .mf-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text); outline: none; transition: border-color 0.15s; }
   .mf-input:focus { border-color: var(--accent); }
   .mf-input::placeholder { color: var(--text3); }
-  .mf-textarea { resize: vertical; min-height: 64px; }
+  .mf-textarea { resize: none; min-height: 64px; overflow: hidden; }
+  .mf-row textarea.mf-input { resize: none; overflow: hidden; }
   .mf-dynamic { display: flex; flex-direction: column; gap: 6px; }
   .mf-row { display: flex; gap: 6px; align-items: flex-start; }
   .mf-row .mf-input { flex: 1; }
@@ -638,6 +639,9 @@ function activateInfoEdit() {
   (s.history||[]).forEach(h=>rpAddHistoryRow(h.date,h.content));
   document.getElementById('rp-bar-view').style.display = 'none';
   document.getElementById('rp-bar-edit').style.display = 'flex';
+  const cont = document.getElementById('screen-info-content');
+  cont.querySelectorAll('textarea').forEach(t => { t.style.height='auto'; t.style.height=t.scrollHeight+'px'; });
+  cont.addEventListener('input', e => { if(e.target.tagName==='TEXTAREA'){ e.target.style.height='auto'; e.target.style.height=e.target.scrollHeight+'px'; } });
 }
 
 function cancelInfoEdit() {
@@ -1093,7 +1097,7 @@ async function saveScreenFromPanel() {
 
 // 우측 패널 동적 행 추가
 function rpAddKpiRow(name='',value='',trend=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="지표명" value="${name}"><input class="mf-input" placeholder="목표값" value="${value}"><input class="mf-input" placeholder="트렌드" value="${trend}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-kpis').appendChild(row);}
-function rpAddDecisionRow(q='',why='',reconsider=''){const row=document.createElement('div');row.className='mf-row';row.style.cssText='flex-direction:column;gap:5px;position:relative';row.innerHTML=`<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><textarea class="mf-input" placeholder="결정 내용" style="min-height:60px;resize:none;width:100%">${q}</textarea><textarea class="mf-input" placeholder="이유" style="min-height:60px;resize:none;width:100%">${why}</textarea><textarea class="mf-input" placeholder="재논의 조건 (선택)" style="min-height:60px;resize:none;width:100%">${reconsider}</textarea>`;document.getElementById('rp-decisions').appendChild(row);}
+function rpAddDecisionRow(q='',why='',reconsider=''){const row=document.createElement('div');row.className='mf-row';row.style.cssText='flex-direction:column;gap:5px;position:relative';row.innerHTML=`<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><textarea class="mf-input" placeholder="결정 내용" style="min-height:60px;resize:none;width:100%">${q}</textarea><textarea class="mf-input" placeholder="이유" style="min-height:60px;resize:none;width:100%">${why}</textarea><textarea class="mf-input" placeholder="재논의 조건 (선택)" style="min-height:60px;resize:none;width:100%">${reconsider}</textarea>`;document.getElementById('rp-decisions').appendChild(row);row.querySelectorAll('textarea').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';});}
 function rpAddFrameRow(val=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="피그마 프레임명" value="${val}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-frames').appendChild(row);}
 function rpAddOwnerRow(name='',role=''){const row=document.createElement('div');row.className='mf-row';row.innerHTML=`<input class="mf-input" placeholder="이름" value="${name}"><input class="mf-input" placeholder="팀" value="${role}"><button class="mf-remove" onclick="this.parentElement.remove()">✕</button>`;document.getElementById('rp-owners').appendChild(row);}
 function rpAddHistoryRow(date='',content=''){
@@ -1101,6 +1105,7 @@ function rpAddHistoryRow(date='',content=''){
   const row=document.createElement('div');row.className='mf-row';row.style.cssText='flex-direction:column;gap:5px;position:relative';
   row.innerHTML=`<button class="mf-remove" onclick="this.closest('.mf-row').remove()" style="position:absolute;top:0;right:0">✕</button><input class="mf-input" placeholder="날짜 (예: 2025-05-29)" value="${today}" style="width:160px"><textarea class="mf-input" placeholder="변경 내용" style="min-height:52px;resize:none;width:100%">${content}</textarea>`;
   document.getElementById('rp-history').appendChild(row);
+  row.querySelectorAll('textarea').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';});
 }
 
 function nl2br(text) {
