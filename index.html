@@ -638,6 +638,9 @@ function activateInfoEdit() {
   (s.history||[]).forEach(h=>rpAddHistoryRow(h.date,h.content));
   document.getElementById('rp-bar-view').style.display = 'none';
   document.getElementById('rp-bar-edit').style.display = 'flex';
+  document.getElementById('screen-info-content').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveScreenFromPanel(); }
+  });
 }
 
 function cancelInfoEdit() {
