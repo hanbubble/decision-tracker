@@ -1012,7 +1012,6 @@ function closeScreenModal() {
   document.getElementById('screen-modal').classList.remove('open');
   editingKey = null;
 }
-document.getElementById('screen-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeScreenModal(); });
 
 // 동적 행 추가 함수
 function addKpiRow(name='', value='', trend='') {
