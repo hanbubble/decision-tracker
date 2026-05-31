@@ -413,10 +413,10 @@
       </div>
       <div class="qa-list" id="qa-list"></div>
       <div class="qa-compose">
-        <textarea class="compose-input" id="compose-q" placeholder="이 화면에 대해 궁금한 점을 적어주세요..." rows="2"></textarea>
+        <textarea class="compose-input" id="compose-q" placeholder="이 화면에 대해 궁금한 점을 적어주세요..." rows="2" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
         <div class="compose-row">
           <select class="compose-select"><option>태그</option><option>UX</option><option>개발</option><option>기획</option></select>
-          <select class="compose-select"><option>슬랙</option><option>피그마</option><option>직접입력</option></select>
+          <select class="compose-select"><option>슬랙</option><option>피그마</option><option>기능명세서</option><option>직접입력</option></select>
           <button class="submit-btn" onclick="submitQ()">등록</button>
         </div>
       </div>
@@ -958,7 +958,9 @@ async function submitQ() {
   if(!q) return;
   const {error}=await sb.from('qa_items').insert({screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']});
   if(error){console.error(error);return;}
-  document.getElementById('compose-q').value='';
+  const ta=document.getElementById('compose-q');
+  ta.value='';
+  ta.style.height='auto';
   switchRpTab('qa');
 }
 
