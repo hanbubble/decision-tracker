@@ -956,12 +956,9 @@ function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel'
 async function submitQ() {
   const q=document.getElementById('compose-q').value.trim();
   if(!q) return;
-  const {data:inserted,error}=await sb.from('qa_items').insert({screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']}).select().single();
+  const {error}=await sb.from('qa_items').insert({screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']});
   if(error){console.error(error);return;}
-  if(!qaData[currentScreen]) qaData[currentScreen]=[];
-  qaData[currentScreen].unshift({id:inserted.id,q:inserted.question,a:'',status:'open',tags:['기타'],source:'manual',time:'방금'});
   document.getElementById('compose-q').value='';
-  renderQaList(currentQaTab);
   switchRpTab('qa');
 }
 
