@@ -774,7 +774,7 @@ async function saveQaEdit(id) {
     const el = document.getElementById(`edit-a-${i}`);
     return el ? {...ans, text: el.value.trim()} : ans;
   }).filter(ans => ans.text);
-  const {error} = await sb.from('qa_items').update({question:q, answers:newAnswers, images:editImages}).eq('id', id);
+  const {error} = await sb.from('qa_items').update({question:q, answers:newAnswers, answer:newAnswers.length?newAnswers[newAnswers.length-1].text:null, images:editImages}).eq('id', id);
   if (error) { alert('저장 실패: ' + error.message); return; }
   found.item.q = q;
   found.item.answers = newAnswers;
