@@ -747,8 +747,9 @@ function editQaItem(id) {
     </div>
     <div>
       <div class="mf-label">답변</div>
-      ${(d.answers&&d.answers.length ? d.answers : [{text:d.a||''}]).map((ans,i)=>`<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">${(d.answers&&d.answers.length>1)?`<span style="font-size:11px;color:var(--text3);padding-top:10px;min-width:32px;">답변${i+1}</span>`:''}
-        <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;">${ans.text}</textarea></div>`).join('')}
+      ${(d.answers&&d.answers.length ? d.answers : [{text:d.a||''}]).map((ans,i)=>`<div class="edit-ans-row" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">${(d.answers&&d.answers.length>1)?`<span style="font-size:11px;color:var(--text3);padding-top:10px;min-width:32px;">답변${i+1}</span>`:''}
+        <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;">${ans.text}</textarea>
+        <button class="attach-thumb-remove" style="position:static;margin-top:8px;flex-shrink:0;" onclick="this.closest('.edit-ans-row').style.display='none';document.getElementById('edit-a-${i}').value=''">✕</button></div>`).join('')}
     </div>
     <div>
       <div class="mf-label">첨부 이미지</div>
