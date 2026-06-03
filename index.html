@@ -981,7 +981,7 @@ async function uploadQaImage(file) {
   const ext = file.name.split('.').pop() || 'jpg';
   const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await sb.storage.from('qa-images').upload(path, file, { cacheControl:'3600', upsert:false });
-  if (error) { console.error('Image upload error:', error); return null; }
+  if (error) { console.error('Image upload error:', error); showToast('이미지 업로드 실패: ' + error.message, 'err'); return null; }
   const { data: { publicUrl } } = sb.storage.from('qa-images').getPublicUrl(path);
   return publicUrl;
 }
