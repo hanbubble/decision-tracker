@@ -256,6 +256,15 @@
   .compose-row { display: flex; gap: 4px; }
   .compose-select { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 5px; font-family: 'Geist', sans-serif; font-size: 15px; color: var(--text2); outline: none; }
   .submit-btn { padding: 4px 10px; background: var(--accent); border: none; border-radius: 4px; font-family: 'Geist', sans-serif; font-size: 15px; font-weight: 500; color: #1a1600; cursor: pointer; flex-shrink: 0; }
+  .attach-btn { background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--text2); cursor: pointer; font-size: 15px; padding: 3px 8px; flex-shrink: 0; }
+  .attach-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .compose-attach-preview { display: flex; flex-wrap: wrap; gap: 6px; }
+  .attach-thumb-wrap { position: relative; flex-shrink: 0; }
+  .attach-thumb-wrap img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); display: block; }
+  .attach-thumb-remove { position: absolute; top: -5px; right: -5px; width: 16px; height: 16px; background: #ef4444; border: none; border-radius: 50%; color: #fff; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
+  .qa-img-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .qa-img-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; transition: opacity 0.15s; }
+  .qa-img-thumb:hover { opacity: 0.8; }
 
   /* ADD SCREEN BUTTON */
   .sb-add-btn { display: flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 15px; color: var(--text3); cursor: pointer; border: none; background: transparent; width: 100%; text-align: left; font-family: 'Geist', sans-serif; transition: all 0.1s; }
@@ -414,9 +423,12 @@
       <div class="qa-list" id="qa-list"></div>
       <div class="qa-compose">
         <textarea class="compose-input" id="compose-q" placeholder="이 화면에 대해 궁금한 점을 적어주세요..." rows="2" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+        <div class="compose-attach-preview" id="compose-attach-preview"></div>
+        <input type="file" id="compose-img-input" accept="image/*" multiple style="display:none" onchange="handleComposeImages(this)">
         <div class="compose-row">
           <select class="compose-select"><option>태그</option><option>UX</option><option>개발</option><option>기획</option></select>
           <select class="compose-select"><option>슬랙</option><option>피그마</option><option>기능명세서</option><option>직접입력</option></select>
+          <button class="attach-btn" onclick="document.getElementById('compose-img-input').click()" title="이미지 첨부">🖼</button>
           <button class="submit-btn" onclick="submitQ()">등록</button>
         </div>
       </div>
@@ -508,6 +520,7 @@ function buildIndex() {
 let searchIndex = [];
 
 let searchMode='keyword', searchTimer=null, currentScreen=null, currentRpTab='info', currentQaTab='all', activeQaCard=null, specOpen=false, aiController=null;
+let composeImages=[], editImages=[];
 
 function setMode(mode) {
   searchMode = mode;
@@ -690,7 +703,7 @@ function showDetail(id) {
   document.getElementById('qm-body').innerHTML = `
     <div>
       <div class="mf-label">질문</div>
-      <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${nl2br(d.q)}</div>
+      <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${nl2br(d.q)}${renderImgGrid(d.images)}</div>
     </div>
     <div>
       <div class="mf-label">답변 ${d.answers&&d.answers.length>1?`(${d.answers.length}개)`:''}</div>
@@ -721,6 +734,7 @@ function editQaItem(id) {
   const found = findQaItem(id);
   if (!found) return;
   const { item: d } = found;
+  editImages = (d.images || []).slice();
 
   document.getElementById('qm-header').innerHTML = `
     <div class="modal-title">Q&A 수정</div>
@@ -735,7 +749,14 @@ function editQaItem(id) {
       <div class="mf-label">답변</div>
       ${(d.answers&&d.answers.length ? d.answers : [{text:d.a||''}]).map((ans,i)=>`<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">${(d.answers&&d.answers.length>1)?`<span style="font-size:11px;color:var(--text3);padding-top:10px;min-width:32px;">답변${i+1}</span>`:''}
         <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;">${ans.text}</textarea></div>`).join('')}
+    </div>
+    <div>
+      <div class="mf-label">첨부 이미지</div>
+      <div class="qa-img-grid" id="edit-img-grid"></div>
+      <input type="file" id="edit-img-input" accept="image/*" multiple style="display:none" onchange="handleEditImages(this)">
+      <button class="attach-btn" style="margin-top:6px;" onclick="document.getElementById('edit-img-input').click()">🖼 이미지 추가</button>
     </div>`;
+  renderEditImgGrid();
 
   document.getElementById('qm-footer').innerHTML = `
     <button class="modal-btn secondary" onclick="showDetail('${id}')">취소</button>
@@ -752,11 +773,12 @@ async function saveQaEdit(id) {
     const el = document.getElementById(`edit-a-${i}`);
     return el ? {...ans, text: el.value.trim()} : ans;
   }).filter(ans => ans.text);
-  const {error} = await sb.from('qa_items').update({question:q, answers:newAnswers}).eq('id', id);
+  const {error} = await sb.from('qa_items').update({question:q, answers:newAnswers, images:editImages}).eq('id', id);
   if (error) { alert('저장 실패: ' + error.message); return; }
   found.item.q = q;
   found.item.answers = newAnswers;
   found.item.a = newAnswers.length ? newAnswers[0].text : '';
+  found.item.images = editImages.slice();
   showDetail(id);
   renderQaList(currentQaTab);
 }
@@ -953,11 +975,63 @@ function loadSpec(save=true) {
   }
 }
 function toggleSpec() { specOpen=!specOpen; document.getElementById('spec-panel').classList.toggle('open',specOpen); document.getElementById('spec-lbl').textContent=specOpen?'접기':'펼치기'; }
+
+async function uploadQaImage(file) {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await sb.storage.from('qa-images').upload(path, file, { cacheControl:'3600', upsert:false });
+  if (error) { console.error('Image upload error:', error); return null; }
+  const { data: { publicUrl } } = sb.storage.from('qa-images').getPublicUrl(path);
+  return publicUrl;
+}
+
+async function handleComposeImages(input) {
+  const files = Array.from(input.files);
+  for (const file of files) {
+    const url = await uploadQaImage(file);
+    if (url) { composeImages.push(url); renderComposePreview(); }
+  }
+  input.value = '';
+}
+
+function renderComposePreview() {
+  const c = document.getElementById('compose-attach-preview');
+  if (!c) return;
+  c.innerHTML = composeImages.map((url, i) =>
+    `<div class="attach-thumb-wrap"><img src="${url}"><button class="attach-thumb-remove" onclick="composeImages.splice(${i},1);renderComposePreview()">✕</button></div>`
+  ).join('');
+}
+
+async function handleEditImages(input) {
+  const files = Array.from(input.files);
+  for (const file of files) {
+    const url = await uploadQaImage(file);
+    if (url) { editImages.push(url); renderEditImgGrid(); }
+  }
+  input.value = '';
+}
+
+function renderEditImgGrid() {
+  const c = document.getElementById('edit-img-grid');
+  if (!c) return;
+  c.innerHTML = editImages.map((url, i) =>
+    `<div class="attach-thumb-wrap"><img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:block;"><button class="attach-thumb-remove" onclick="editImages.splice(${i},1);renderEditImgGrid()">✕</button></div>`
+  ).join('');
+}
+
+function renderImgGrid(images) {
+  if (!images || !images.length) return '';
+  return `<div class="qa-img-grid">${images.map(url=>`<img class="qa-img-thumb" src="${url}" onclick="window.open('${url}','_blank')" alt="">`).join('')}</div>`;
+}
 async function submitQ() {
   const q=document.getElementById('compose-q').value.trim();
   if(!q) return;
-  const {error}=await sb.from('qa_items').insert({screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']});
+  const payload={screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']};
+  if(composeImages.length) payload.images=composeImages.slice();
+  const {error}=await sb.from('qa_items').insert(payload);
   if(error){console.error(error);return;}
+  composeImages=[];
+  renderComposePreview();
   const ta=document.getElementById('compose-q');
   ta.value='';
   ta.style.height='auto';
@@ -1144,7 +1218,7 @@ async function init() {
     const k = row.screen_id || '__unassigned__';
     if (!qaData[k]) qaData[k] = [];
     const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer, created_at:row.created_at}] : []);
-    qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, sourceUrl:row.source_url||'', time:formatTime(row.created_at), itemType:row.item_type||'qa'});
+    qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, sourceUrl:row.source_url||'', time:formatTime(row.created_at), itemType:row.item_type||'qa', images:row.images||[]});
   });
   searchIndex = buildIndex();
   sb.channel('realtime-qa')
@@ -1153,7 +1227,7 @@ async function init() {
       const k = row.screen_id || '__unassigned__';
       if (!qaData[k]) qaData[k] = [];
       const ans = row.answers && row.answers.length ? row.answers : (row.answer ? [{text:row.answer, created_at:row.created_at}] : []);
-      qaData[k].unshift({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, time:'방금'});
+      qaData[k].unshift({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, time:'방금', images:row.images||[]});
       if (k === currentScreen) renderQaList(currentQaTab);
       renderSidebarScreens();
       searchIndex = buildIndex();
@@ -1167,6 +1241,7 @@ async function init() {
         found.item.a = ans.length ? ans[0].text : '';
         found.item.status = row.status;
         found.item.q = row.question;
+        found.item.images = row.images || [];
         if (found.screenKey === currentScreen) renderQaList(currentQaTab);
         if (activeQaCard === row.id) showDetail(row.id);
       }
