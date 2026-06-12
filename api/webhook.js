@@ -233,8 +233,37 @@ module.exports = async function handler(req, res) {
 
     async function findScreenByNode(nid) {
       if (!nid) return null;
+
+      // 정확한 매칭
       const { data } = await supabase.from('screens').select('id').eq('figma_node_id', nid).limit(1);
-      return data?.[0]?.id || null;
+      if (data?.[0]) return data[0].id;
+
+      // 폴백: 코멘트 노드가 속한 프레임 찾기
+      const token = process.env.FIGMA_ACCESS_TOKEN;
+      if (!token || !file_key) return null;
+      try {
+        const { data: screens } = await supabase.from('screens').select('id, figma_node_id').not('figma_node_id', 'is', null);
+        if (!screens?.length) return null;
+        const ids = screens.map(s => s.figma_node_id).join(',');
+        const r = await fetch(`https://api.figma.com/v1/files/${file_key}/nodes?ids=${encodeURIComponent(ids)}`, {
+          headers: { 'X-Figma-Token': token },
+        });
+        const d = await r.json();
+        function hasChild(node, id) {
+          if (node.id === id) return true;
+          return node.children?.some(c => hasChild(c, id)) ?? false;
+        }
+        for (const screen of screens) {
+          const doc = d.nodes?.[screen.figma_node_id]?.document;
+          if (doc && hasChild(doc, nid)) {
+            console.log('[Figma] node', nid, '→ screen', screen.id);
+            return screen.id;
+          }
+        }
+      } catch (e) {
+        console.error('[Figma] Screen lookup fallback error:', e);
+      }
+      return null;
     }
 
     async function fetchFigmaComments(fileKey) {
