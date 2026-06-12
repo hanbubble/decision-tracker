@@ -216,15 +216,20 @@ module.exports = async function handler(req, res) {
 
   // ── Figma ──────────────────────────────────────────────────────────────
   if (source === 'figma') {
-    const { event_type, comment, file_key } = body;
+    const { event_type, file_key } = body;
     if (event_type !== 'FILE_COMMENT' && event_type !== 'COMMENT') {
       return res.status(200).json({ ok: true });
     }
 
-    const msg = comment?.message || '';
-    const nodeId = comment?.client_meta?.node_id || null;
-    const parentId = comment?.parent_id || null;
-    const commentId = comment?.id;
+    const commentParts = Array.isArray(body.comment) ? body.comment : [];
+    const msg = commentParts.map(p => p.text || '').join('');
+    const hasMention = commentParts.some(p => p.mention);
+    const nodeId = body.client_meta?.node_id || null;
+    const parentId = body.parent_id || null;
+    const commentId = body.comment_id;
+    const author = body.triggered_by?.handle || body.triggered_by?.id;
+
+    console.log('[Figma] parsed: parentId:', parentId, 'nodeId:', nodeId, 'hasMention:', hasMention, 'msg:', msg.slice(0, 60));
 
     async function findScreenByNode(nid) {
       if (!nid) return null;
@@ -253,7 +258,7 @@ module.exports = async function handler(req, res) {
           source: 'figma',
           figma_comment_id: commentId,
           figma_node_id: nodeId,
-          source_author: comment?.user?.handle,
+          source_author: author,
           ...(screenId ? { screen_id: screenId } : {}),
         });
         if (error) console.error('[Figma] Insert error:', error);
@@ -261,8 +266,8 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // Case 2: 답글에 @loopnote 태그 → 부모 코멘트 + 전체 스레드 수집
-    if (parentId && msg.includes('@somesay')) {
+    // Case 2: 답글에 멘션 → 부모 코멘트 + 전체 스레드 수집
+    if (parentId && hasMention) {
       try {
         const allComments = await fetchFigmaComments(file_key);
         const parent = allComments.find(c => c.id === parentId);
