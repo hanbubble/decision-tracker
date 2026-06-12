@@ -39,7 +39,7 @@ async function fetchAnyMessage(channel, ts) {
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(200).json({ ok: true });
   }
 
   const source = req.query.source;
@@ -261,7 +261,7 @@ module.exports = async function handler(req, res) {
     }
 
     // Case 2: 답글에 @loopnote 태그 → 부모 코멘트 + 전체 스레드 수집
-    if (parentId && msg.includes('@loopnote')) {
+    if (parentId && msg.includes('@somesay')) {
       try {
         const allComments = await fetchFigmaComments(file_key);
         const parent = allComments.find(c => c.id === parentId);
