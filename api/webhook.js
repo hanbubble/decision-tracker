@@ -44,6 +44,7 @@ module.exports = async function handler(req, res) {
 
   const source = req.query.source;
   const body = req.body;
+  console.log('[DEBUG] method:', req.method, 'source:', source, 'body:', JSON.stringify(body).slice(0, 200));
 
   // ── Slack ──────────────────────────────────────────────────────────────
   if (source === 'slack') {
