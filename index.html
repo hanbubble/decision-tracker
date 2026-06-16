@@ -567,10 +567,14 @@ async function doAISearch(query) {
     });
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let parsed; try { parsed = JSON.parse(text); } catch { parsed = null; }
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    let parsed = null;
+    if (jsonMatch) try { parsed = JSON.parse(jsonMatch[0]); } catch {}
     if (parsed?.matches) {
       const aiResults = parsed.matches.filter(m=>m.index>=0&&m.index<searchIndex.length).map(m=>({...searchIndex[m.index],score:m.score,aiReason:m.reason}));
       renderResults(aiResults, query, parsed.summary, false);
+    } else {
+      renderResults(kwResults, query, null, false);
     }
   } catch(e) { if (e.name!=='AbortError') renderResults(kwResults, query, null, false); }
 }
