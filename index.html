@@ -556,15 +556,17 @@ async function doAISearch(query) {
   renderResults(kwResults, query, null, true);
   const context = searchIndex.map((item,i) => `[${i}] type:${item.type} screen:${item.sub} title:"${item.title}" body:"${item.body}"`).join('\n');
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
       method:'POST', signal:aiController.signal,
-      headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000,
-        system:`당신은 프로덕트 팀의 Q&A 검색 도우미입니다. 다음 형식의 JSON만 반환하세요:\n{"summary":"2줄 이내 요약","matches":[{"index":숫자,"score":0~100,"reason":"관련 이유 한 줄"}]}\n최대 6개, score 높은 순.`,
-        messages:[{role:'user',content:`쿼리: "${query}"\n\n데이터:\n${context}`}] })
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        system_instruction:{parts:[{text:`당신은 프로덕트 팀의 Q&A 검색 도우미입니다. 다음 형식의 JSON만 반환하세요:\n{"summary":"2줄 이내 요약","matches":[{"index":숫자,"score":0~100,"reason":"관련 이유 한 줄"}]}\n최대 6개, score 높은 순.`}]},
+        contents:[{role:'user',parts:[{text:`쿼리: "${query}"\n\n데이터:\n${context}`}]}],
+        generationConfig:{maxOutputTokens:1000}
+      })
     });
     const data = await res.json();
-    const text = data.content?.[0]?.text || '';
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     let parsed; try { parsed = JSON.parse(text); } catch { parsed = null; }
     if (parsed?.matches) {
       const aiResults = parsed.matches.filter(m=>m.index>=0&&m.index<searchIndex.length).map(m=>({...searchIndex[m.index],score:m.score,aiReason:m.reason}));
