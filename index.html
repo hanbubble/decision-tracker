@@ -526,8 +526,7 @@ function setMode(mode) {
   searchMode = mode;
   document.getElementById('mode-keyword').classList.toggle('active', mode==='keyword');
   document.getElementById('mode-ai').classList.toggle('active', mode==='ai');
-  const q = document.getElementById('search-input').value.trim();
-  if (q) doSearch(q);
+  closeDropdown();
 }
 
 document.getElementById('search-input').addEventListener('input', e => {
