@@ -534,9 +534,15 @@ document.getElementById('search-input').addEventListener('input', e => {
   clearTimeout(searchTimer);
   const q = e.target.value.trim();
   if (!q) { closeDropdown(); return; }
-  searchTimer = setTimeout(() => doSearch(q), searchMode==='ai' ? 600 : 200);
+  if (searchMode === 'keyword') searchTimer = setTimeout(() => doKeywordSearch(q), 200);
 });
-document.getElementById('search-input').addEventListener('focus', e => { if (e.target.value.trim()) doSearch(e.target.value.trim()); });
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const q = e.target.value.trim();
+    if (q) doSearch(q);
+  }
+});
+document.getElementById('search-input').addEventListener('focus', e => { if (e.target.value.trim() && searchMode==='keyword') doKeywordSearch(e.target.value.trim()); });
 document.addEventListener('click', e => { if (!document.getElementById('search-wrap').contains(e.target)) closeDropdown(); });
 document.addEventListener('keydown', e => { if ((e.metaKey||e.ctrlKey) && e.key==='k') { e.preventDefault(); document.getElementById('search-input').focus(); } });
 
