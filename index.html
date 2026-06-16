@@ -755,12 +755,12 @@ function editQaItem(id) {
   document.getElementById('qm-body').innerHTML = `
     <div>
       <div class="mf-label">질문</div>
-      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;">${d.q}</textarea>
+      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${d.q}</textarea>
     </div>
     <div>
       <div class="mf-label">답변</div>
       ${(d.answers&&d.answers.length ? d.answers : [{text:d.a||''}]).map((ans,i)=>`<div class="edit-ans-row" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">${(d.answers&&d.answers.length>1)?`<span style="font-size:11px;color:var(--text3);padding-top:10px;min-width:32px;">답변${i+1}</span>`:''}
-        <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;">${ans.text}</textarea>
+        <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${ans.text}</textarea>
         <button class="attach-thumb-remove" style="position:static;margin-top:8px;flex-shrink:0;" onclick="this.closest('.edit-ans-row').style.display='none';document.getElementById('edit-a-${i}').value=''">✕</button></div>`).join('')}
     </div>
     <div>
@@ -770,6 +770,7 @@ function editQaItem(id) {
       <button class="attach-btn" style="margin-top:6px;" onclick="document.getElementById('edit-img-input').click()">🖼 이미지 추가</button>
     </div>`;
   renderEditImgGrid();
+  document.getElementById('qm-body').querySelectorAll('textarea').forEach(t => { t.style.height='auto'; t.style.height=t.scrollHeight+'px'; });
 
   document.getElementById('qm-footer').innerHTML = `
     <button class="modal-btn secondary" onclick="showDetail('${id}')">취소</button>
@@ -1094,7 +1095,10 @@ function openScreenModal(key) {
   (s?.figmaFrames||[]).forEach(f => addFrameRow(f));
   (s?.owners||[]).forEach(o => addOwnerRow(o.name, o.role));
   document.getElementById('screen-modal').classList.add('open');
+  const mb = document.querySelector('#screen-modal .modal-body');
+  mb.querySelectorAll('textarea').forEach(t => { t.style.height='auto'; t.style.height=t.scrollHeight+'px'; });
 }
+document.querySelector('#screen-modal .modal-body').addEventListener('input', e => { if(e.target.tagName==='TEXTAREA'){ e.target.style.height='auto'; e.target.style.height=e.target.scrollHeight+'px'; } });
 function closeScreenModal() {
   document.getElementById('screen-modal').classList.remove('open');
   editingKey = null;
