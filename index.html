@@ -422,14 +422,8 @@
       </div>
       <div class="qa-list" id="qa-list"></div>
       <div class="qa-compose">
-        <textarea class="compose-input" id="compose-q" placeholder="이 화면에 대해 궁금한 점을 적어주세요..." rows="2" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
-        <div class="compose-attach-preview" id="compose-attach-preview"></div>
-        <input type="file" id="compose-img-input" accept="image/*" multiple style="display:none" onchange="handleComposeImages(this)">
-        <div class="compose-row">
-          <select class="compose-select"><option>태그</option><option>UX</option><option>개발</option><option>기획</option></select>
-          <select class="compose-select"><option>슬랙</option><option>피그마</option><option>기능명세서</option><option>직접입력</option></select>
-          <button class="attach-btn" onclick="document.getElementById('compose-img-input').click()">이미지</button>
-          <button class="submit-btn" onclick="submitQ()">등록</button>
+        <div class="compose-row" style="justify-content:flex-end;">
+          <button class="submit-btn" onclick="openNewQaModal()">등록</button>
         </div>
       </div>
     </div>
@@ -520,7 +514,7 @@ function buildIndex() {
 let searchIndex = [];
 
 let searchMode='keyword', searchTimer=null, currentScreen=null, currentRpTab='info', currentQaTab='all', activeQaCard=null, specOpen=false, aiController=null;
-let composeImages=[], editImages=[];
+let editImages=[];
 
 function setMode(mode) {
   searchMode = mode;
@@ -999,22 +993,6 @@ async function uploadQaImage(file) {
   return publicUrl;
 }
 
-async function handleComposeImages(input) {
-  const files = Array.from(input.files);
-  for (const file of files) {
-    const url = await uploadQaImage(file);
-    if (url) { composeImages.push(url); renderComposePreview(); }
-  }
-  input.value = '';
-}
-
-function renderComposePreview() {
-  const c = document.getElementById('compose-attach-preview');
-  if (!c) return;
-  c.innerHTML = composeImages.map((url, i) =>
-    `<div class="attach-thumb-wrap"><img src="${url}"><button class="attach-thumb-remove" onclick="composeImages.splice(${i},1);renderComposePreview()">✕</button></div>`
-  ).join('');
-}
 
 async function handleEditImages(input) {
   const files = Array.from(input.files);
@@ -1037,19 +1015,59 @@ function renderImgGrid(images) {
   if (!images || !images.length) return '';
   return `<div class="qa-img-grid">${images.map(url=>`<img class="qa-img-thumb" src="${url}" onclick="window.open('${url}','_blank')" alt="">`).join('')}</div>`;
 }
-async function submitQ() {
-  const q=document.getElementById('compose-q').value.trim();
-  if(!q) return;
-  const payload={screen_id:currentScreen||null,question:q,status:'open',source:'manual',tags:['기타']};
-  if(composeImages.length) payload.images=composeImages.slice();
-  const {error}=await sb.from('qa_items').insert(payload);
-  if(error){console.error(error);return;}
-  composeImages=[];
-  renderComposePreview();
-  const ta=document.getElementById('compose-q');
-  ta.value='';
-  ta.style.height='auto';
-  switchRpTab('qa');
+function openNewQaModal() {
+  editImages = [];
+
+  document.getElementById('qm-header').innerHTML = `
+    <div class="modal-title">Q&A 등록</div>
+    <button class="modal-close" onclick="closeDetail()">✕</button>`;
+
+  document.getElementById('qm-body').innerHTML = `
+    <div>
+      <div class="mf-label">질문</div>
+      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" placeholder="궁금한 점을 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+    </div>
+    <div>
+      <div class="mf-label">답변 <span style="color:var(--text3);font-weight:400;">(선택)</span></div>
+      <div class="edit-ans-row" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">
+        <textarea id="edit-a-0" class="mf-input mf-textarea" style="min-height:60px;flex:1;" placeholder="답변이 있으면 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      </div>
+    </div>
+    <div>
+      <div class="mf-label">첨부 이미지</div>
+      <div class="qa-img-grid" id="edit-img-grid"></div>
+      <input type="file" id="edit-img-input" accept="image/*" multiple style="display:none" onchange="handleEditImages(this)">
+      <button class="attach-btn" style="margin-top:6px;" onclick="document.getElementById('edit-img-input').click()">이미지 추가</button>
+    </div>`;
+  renderEditImgGrid();
+
+  document.getElementById('qm-footer').innerHTML = `
+    <button class="modal-btn secondary" onclick="closeDetail()">취소</button>
+    <button class="modal-btn primary" onclick="submitNewQa()">등록</button>`;
+
+  document.getElementById('qa-modal').classList.add('open');
+}
+
+async function submitNewQa() {
+  const q = document.getElementById('edit-q').value.trim();
+  if (!q) return;
+  const ansEl = document.getElementById('edit-a-0');
+  const ansText = ansEl ? ansEl.value.trim() : '';
+  const answers = ansText ? [{ text: ansText, author: null, created_at: new Date().toISOString() }] : [];
+  const screenId = currentScreen === '__unassigned__' ? null : currentScreen || null;
+  const payload = {
+    screen_id: screenId,
+    question: q,
+    status: answers.length ? 'resolved' : 'open',
+    source: 'manual',
+    tags: ['기타'],
+    images: editImages.slice(),
+    ...(answers.length ? { answers, answer: ansText } : {}),
+  };
+  const { error } = await sb.from('qa_items').insert(payload);
+  if (error) { alert('등록 실패: ' + error.message); return; }
+  editImages = [];
+  closeDetail();
 }
 
 // 사이드바 화면 목록 렌더링
