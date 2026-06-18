@@ -416,8 +416,7 @@
     <div class="qa-body" id="pane-qa">
       <div class="qa-sub-tabs">
         <div class="qa-sub-tab active" onclick="switchQaTab('all',this)">전체</div>
-        <div class="qa-sub-tab" onclick="switchQaTab('open',this)">미해결</div>
-        <div class="qa-sub-tab" onclick="switchQaTab('resolved',this)">해결됨</div>
+        <div class="qa-sub-tab" onclick="switchQaTab('qa',this)">QnA</div>
         <div class="qa-sub-tab" onclick="switchQaTab('notice',this)">전달사항</div>
       </div>
       <div class="qa-list" id="qa-list"></div>
@@ -668,7 +667,7 @@ function cancelInfoEdit() {
 }
 
 function renderQaList(tab) {
-  const items = (qaData[currentScreen]||[]).filter(d=>tab==='all'||(tab==='notice'?d.itemType==='notice':(d.itemType!=='notice')&&d.status===tab));
+  const items = (qaData[currentScreen]||[]).filter(d=>tab==='all'||(tab==='notice'?d.itemType==='notice':d.itemType!=='notice'));
   document.getElementById('qa-list').innerHTML = items.map(d=>`<div class="qa-card ${activeQaCard===d.id?'active':''}" onclick="showDetail('${d.id}')"><div class="qa-card-top"><div class="qa-status ${d.itemType==='notice'?'notice':d.status}">${d.itemType==='notice'?'🔖':d.status==='resolved'?'✓':'!'}</div><div class="qa-q">${nl2br(d.q)}</div></div>${(d.answers&&d.answers.length)?d.answers.map(ans=>`<div class="qa-a-preview">${nl2br(ans.text.length>120?ans.text.slice(0,120)+'…':ans.text)}</div>`).join(''):''}<div class="qa-meta">${d.tags.map(t=>`<span class="qa-tag">${t}</span>`).join('')}<span class="src-badge src-${d.source}">${d.source==='slack'?'슬랙':d.source==='figma'?'피그마':'직접입력'}</span><span class="qa-time">${d.time}</span></div></div>`).join('');
   document.getElementById('qa-count').textContent = (qaData[currentScreen]||[]).length;
 }
