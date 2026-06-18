@@ -1019,15 +1019,22 @@ function openNewQaModal() {
   editImages = [];
 
   document.getElementById('qm-header').innerHTML = `
-    <div class="modal-title">Q&A 등록</div>
+    <div class="modal-title">코멘트 등록</div>
     <button class="modal-close" onclick="closeDetail()">✕</button>`;
 
   document.getElementById('qm-body').innerHTML = `
     <div>
-      <div class="mf-label">질문</div>
-      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" placeholder="궁금한 점을 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <div class="mf-label">유형</div>
+      <div style="display:flex;gap:8px;">
+        <button id="new-type-qa" class="modal-btn primary" style="flex:1;" onclick="setNewQaType('qa')">질문</button>
+        <button id="new-type-notice" class="modal-btn secondary" style="flex:1;" onclick="setNewQaType('notice')">전달사항</button>
+      </div>
     </div>
     <div>
+      <div class="mf-label">코멘트</div>
+      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" placeholder="내용을 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+    </div>
+    <div id="new-qa-answer-section">
       <div class="mf-label">답변 <span style="color:var(--text3);font-weight:400;">(선택)</span></div>
       <div class="edit-ans-row" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">
         <textarea id="edit-a-0" class="mf-input mf-textarea" style="min-height:60px;flex:1;" placeholder="답변이 있으면 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
@@ -1048,11 +1055,19 @@ function openNewQaModal() {
   document.getElementById('qa-modal').classList.add('open');
 }
 
+function setNewQaType(type) {
+  document.getElementById('new-type-qa').className = 'modal-btn ' + (type === 'qa' ? 'primary' : 'secondary');
+  document.getElementById('new-type-notice').className = 'modal-btn ' + (type === 'notice' ? 'primary' : 'secondary');
+  const ansSection = document.getElementById('new-qa-answer-section');
+  if (ansSection) ansSection.style.display = type === 'notice' ? 'none' : '';
+}
+
 async function submitNewQa() {
   const q = document.getElementById('edit-q').value.trim();
   if (!q) return;
+  const isNotice = document.getElementById('new-type-notice')?.classList.contains('primary');
   const ansEl = document.getElementById('edit-a-0');
-  const ansText = ansEl ? ansEl.value.trim() : '';
+  const ansText = (!isNotice && ansEl) ? ansEl.value.trim() : '';
   const answers = ansText ? [{ text: ansText, author: null, created_at: new Date().toISOString() }] : [];
   const screenId = currentScreen === '__unassigned__' ? null : currentScreen || null;
   const payload = {
@@ -1062,6 +1077,7 @@ async function submitNewQa() {
     source: 'manual',
     tags: ['기타'],
     images: editImages.slice(),
+    ...(isNotice ? { item_type: 'notice' } : {}),
     ...(answers.length ? { answers, answer: ansText } : {}),
   };
   const { error } = await sb.from('qa_items').insert(payload);
