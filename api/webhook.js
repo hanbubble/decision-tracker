@@ -9,6 +9,39 @@ const SLACK_HEADERS = () => ({
   Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
 });
 
+const EMOJI_MAP = {
+  exclamation:'❗', question:'❓', white_check_mark:'✅', x:'❌',
+  warning:'⚠️', fire:'🔥', bulb:'💡', eyes:'👀', thumbsup:'👍',
+  thumbsdown:'👎', pray:'🙏', tada:'🎉', rocket:'🚀', star:'⭐',
+  sob:'😭', joy:'😂', smile:'😊', thinking_face:'🤔', sweat_smile:'😅',
+  raised_hands:'🙌', clap:'👏', heart:'❤️', ok_hand:'👌',
+  point_right:'👉', point_left:'👈', point_up:'👆', point_down:'👇',
+  check:'✔️', heavy_check_mark:'✔️', memo:'📝', pencil:'✏️',
+  paperclip:'📎', link:'🔗', bell:'🔔', mega:'📣', loudspeaker:'📢',
+  information_source:'ℹ️', rotating_light:'🚨', sos:'🆘',
+  red_circle:'🔴', large_green_circle:'🟢', large_yellow_circle:'🟡',
+  large_blue_circle:'🔵', large_orange_circle:'🟠',
+  arrow_right:'➡️', arrow_left:'⬅️', arrow_up:'⬆️', arrow_down:'⬇️',
+  sparkles:'✨', zap:'⚡', boom:'💥', speech_balloon:'💬',
+};
+
+function cleanSlackText(text) {
+  if (!text) return text;
+  return text
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&')
+    .replace(/<@[A-Z0-9]+\|([^>]+)>/g, '@$1')
+    .replace(/<@[A-Z0-9]+>/g, '@멘션')
+    .replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1')
+    .replace(/<!here>/g, '@here')
+    .replace(/<!channel>/g, '@channel')
+    .replace(/<!everyone>/g, '@everyone')
+    .replace(/<([^|>]+)\|([^>]+)>/g, '$2')
+    .replace(/<(https?:\/\/[^>]+)>/g, '$1')
+    .replace(/:([a-z0-9_+-]+):/g, (m, name) => EMOJI_MAP[name] || m);
+}
+
 // 채널 메시지 + 스레드 답글 모두 커버 (reactions.get 기반)
 async function fetchAnyMessage(channel, ts) {
   // reactions.get으로 반응 달린 메시지 직접 조회 (thread_ts 포함)
@@ -69,7 +102,7 @@ module.exports = async function handler(req, res) {
         let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
         try {
           const msg = await fetchAnyMessage(channel, ts);
-          if (msg?.text) question = msg.text;
+          if (msg?.text) question = cleanSlackText(msg.text);
         } catch (e) {
           console.error('Slack fetch error:', e);
         }
@@ -124,7 +157,7 @@ module.exports = async function handler(req, res) {
         let question = '(슬랙 메시지 내용을 가져오지 못했습니다)';
         try {
           const msg = await fetchAnyMessage(channel, ts);
-          if (msg?.text) question = msg.text;
+          if (msg?.text) question = cleanSlackText(msg.text);
         } catch (e) {
           console.error('[Notice] Slack fetch error:', e);
         }
@@ -151,7 +184,7 @@ module.exports = async function handler(req, res) {
       try {
         const msg = await fetchAnyMessage(channel, ts);
         console.log('[A] msg ok:', !!msg, 'text:', msg?.text?.slice(0, 40), 'thread_ts:', msg?.thread_ts, 'ts:', msg?.ts);
-        if (msg?.text) answerText = msg.text;
+        if (msg?.text) answerText = cleanSlackText(msg.text);
         if (msg?.thread_ts && msg.thread_ts !== msg.ts) {
           parentTs = msg.thread_ts;
         }
