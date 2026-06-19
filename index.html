@@ -1030,6 +1030,14 @@ function openNewQaModal() {
       </div>
     </div>
     <div>
+      <div class="mf-label">카테고리</div>
+      <div style="display:flex;gap:8px;">
+        <button id="new-cat-plan" class="modal-btn primary" style="flex:1;" onclick="setNewQaCategory('기획')">기획</button>
+        <button id="new-cat-dev" class="modal-btn secondary" style="flex:1;" onclick="setNewQaCategory('개발')">개발</button>
+        <button id="new-cat-design" class="modal-btn secondary" style="flex:1;" onclick="setNewQaCategory('디자인')">디자인</button>
+      </div>
+    </div>
+    <div>
       <div class="mf-label">코멘트</div>
       <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" placeholder="내용을 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
     </div>
@@ -1061,6 +1069,13 @@ function setNewQaType(type) {
   if (ansSection) ansSection.style.display = type === 'notice' ? 'none' : '';
 }
 
+function setNewQaCategory(cat) {
+  ['기획','개발','디자인'].forEach(c => {
+    const id = c==='기획'?'new-cat-plan':c==='개발'?'new-cat-dev':'new-cat-design';
+    document.getElementById(id).className = 'modal-btn ' + (c === cat ? 'primary' : 'secondary');
+  });
+}
+
 async function submitNewQa() {
   const q = document.getElementById('edit-q').value.trim();
   if (!q) return;
@@ -1074,7 +1089,7 @@ async function submitNewQa() {
     question: q,
     status: answers.length ? 'resolved' : 'open',
     source: 'manual',
-    tags: ['기타'],
+    tags: [document.getElementById('new-cat-plan')?.classList.contains('primary') ? '기획' : document.getElementById('new-cat-dev')?.classList.contains('primary') ? '개발' : '디자인'],
     images: editImages.slice(),
     ...(isNotice ? { item_type: 'notice' } : {}),
     ...(answers.length ? { answers, answer: ansText } : {}),
