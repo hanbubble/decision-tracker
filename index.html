@@ -743,7 +743,7 @@ function editQaItem(id) {
   const { item: d } = found;
   editImages = (d.images || []).slice();
   const isNotice = d.itemType === 'notice';
-  const currentCat = (d.tags && d.tags[0]) || '기획';
+  const currentCat = (d.tags && d.tags[0]) || null;
 
   document.getElementById('qm-header').innerHTML = `
     <div class="modal-title">${isNotice ? '전달사항' : 'Q&A'} 수정</div>
@@ -812,7 +812,8 @@ async function saveQaEdit(id) {
   if (!found) return;
   const isNotice = document.getElementById('edit-type-notice')?.classList.contains('primary');
   const cat = document.getElementById('edit-cat-plan')?.classList.contains('primary') ? '기획'
-    : document.getElementById('edit-cat-dev')?.classList.contains('primary') ? '개발' : '디자인';
+    : document.getElementById('edit-cat-dev')?.classList.contains('primary') ? '개발'
+    : document.getElementById('edit-cat-design')?.classList.contains('primary') ? '디자인' : null;
   const origAnswers = found.item.answers && found.item.answers.length ? found.item.answers : [{text: found.item.a||''}];
   const newAnswers = isNotice ? [] : origAnswers.map((ans, i) => {
     const el = document.getElementById(`edit-a-${i}`);
@@ -823,7 +824,7 @@ async function saveQaEdit(id) {
     answers: newAnswers,
     answer: newAnswers.length ? newAnswers[newAnswers.length-1].text : null,
     images: editImages,
-    tags: [cat],
+    tags: cat ? [cat] : null,
     item_type: isNotice ? 'notice' : 'qa',
   }).eq('id', id);
   if (error) { alert('저장 실패: ' + error.message); return; }
@@ -831,7 +832,7 @@ async function saveQaEdit(id) {
   found.item.answers = newAnswers;
   found.item.a = newAnswers.length ? newAnswers[0].text : '';
   found.item.images = editImages.slice();
-  found.item.tags = [cat];
+  found.item.tags = cat ? [cat] : [];
   found.item.itemType = isNotice ? 'notice' : 'qa';
   showDetail(id);
   renderQaList(currentQaTab);
