@@ -700,6 +700,7 @@ function showDetail(id) {
   document.getElementById('qm-header').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       ${statusLabel}
+      ${d.tags&&d.tags[0]?`<span style="font-size:13px;padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text3);">${d.tags[0]}</span>`:''}
       <span style="font-size:13px;color:var(--text3);">${srcLabel} · ${d.time}</span>
       ${d.sourceUrl?`<a href="${d.sourceUrl}" target="_blank" style="font-size:13px;color:var(--accent);text-decoration:none;padding:2px 7px;border:1px solid rgba(232,201,126,0.3);border-radius:4px;">↗ 원본 보기</a>`:''}
     </div>
@@ -707,16 +708,17 @@ function showDetail(id) {
 
   document.getElementById('qm-body').innerHTML = `
     <div>
-      <div class="mf-label">질문</div>
+      <div class="mf-label">${d.itemType==='notice' ? '내용' : '질문'}</div>
       <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${nl2br(d.q)}${renderImgGrid(d.images)}</div>
     </div>
+    ${d.itemType!=='notice' ? `
     <div>
       <div class="mf-label">답변 ${d.answers&&d.answers.length>1?`(${d.answers.length}개)`:''}</div>
       ${d.answers&&d.answers.length
         ? d.answers.map((ans,i)=>`<div style="margin-bottom:6px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">${d.answers.length>1?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px;">답변 ${i+1}</div>`:''}
           <div style="font-size:15px;color:var(--text2);line-height:1.6;">${nl2br(ans.text)}</div></div>`).join('')
         : `<div style="font-size:15px;color:var(--text3);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;min-height:60px;">아직 답변이 없습니다.</div>`}
-    </div>
+    </div>` : ''}
     <div>
       <div class="mf-label">화면 이동</div>
       <div style="display:flex;gap:6px;">
@@ -727,7 +729,7 @@ function showDetail(id) {
 
   document.getElementById('qm-footer').innerHTML = `
     <button class="modal-btn secondary" onclick="deleteQaItem('${id}')" style="color:var(--red);border-color:rgba(248,113,113,0.4);margin-right:auto;">삭제</button>
-    <button class="modal-btn secondary" onclick="toggleQaStatus('${id}')">${d.status==='resolved'?'↩ 미해결':'✓ 해결됨'}</button>
+    ${d.itemType!=='notice' ? `<button class="modal-btn secondary" onclick="toggleQaStatus('${id}')">${d.status==='resolved'?'↩ 미해결':'✓ 해결됨'}</button>` : ''}
     <button class="modal-btn secondary" onclick="editQaItem('${id}')">수정</button>
     <button class="modal-btn primary" onclick="closeDetail()">닫기</button>`;
 
@@ -740,17 +742,34 @@ function editQaItem(id) {
   if (!found) return;
   const { item: d } = found;
   editImages = (d.images || []).slice();
+  const isNotice = d.itemType === 'notice';
+  const currentCat = (d.tags && d.tags[0]) || '기획';
 
   document.getElementById('qm-header').innerHTML = `
-    <div class="modal-title">Q&A 수정</div>
+    <div class="modal-title">${isNotice ? '전달사항' : 'Q&A'} 수정</div>
     <button class="modal-close" onclick="showDetail('${id}')">✕</button>`;
 
   document.getElementById('qm-body').innerHTML = `
     <div>
-      <div class="mf-label">질문</div>
-      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${d.q}</textarea>
+      <div class="mf-label">유형</div>
+      <div style="display:flex;gap:8px;">
+        <button id="edit-type-qa" class="modal-btn ${isNotice?'secondary':'primary'}" style="flex:1;" onclick="setEditType('qa')">질문</button>
+        <button id="edit-type-notice" class="modal-btn ${isNotice?'primary':'secondary'}" style="flex:1;" onclick="setEditType('notice')">전달사항</button>
+      </div>
     </div>
     <div>
+      <div class="mf-label">카테고리</div>
+      <div style="display:flex;gap:8px;">
+        <button id="edit-cat-plan" class="modal-btn ${currentCat==='기획'?'primary':'secondary'}" style="flex:1;" onclick="setEditCategory('기획')">기획</button>
+        <button id="edit-cat-dev" class="modal-btn ${currentCat==='개발'?'primary':'secondary'}" style="flex:1;" onclick="setEditCategory('개발')">개발</button>
+        <button id="edit-cat-design" class="modal-btn ${currentCat==='디자인'?'primary':'secondary'}" style="flex:1;" onclick="setEditCategory('디자인')">디자인</button>
+      </div>
+    </div>
+    <div>
+      <div class="mf-label" id="edit-q-label">${isNotice ? '내용' : '질문'}</div>
+      <textarea id="edit-q" class="mf-input mf-textarea" style="min-height:80px;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${d.q}</textarea>
+    </div>
+    <div id="edit-answer-section"${isNotice?' style="display:none"':''}>
       <div class="mf-label">답변</div>
       ${(d.answers&&d.answers.length ? d.answers : [{text:d.a||''}]).map((ans,i)=>`<div class="edit-ans-row" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;">${(d.answers&&d.answers.length>1)?`<span style="font-size:11px;color:var(--text3);padding-top:10px;min-width:32px;">답변${i+1}</span>`:''}
         <textarea id="edit-a-${i}" class="mf-input mf-textarea" style="min-height:80px;flex:1;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${ans.text}</textarea>
@@ -760,7 +779,7 @@ function editQaItem(id) {
       <div class="mf-label">첨부 이미지</div>
       <div class="qa-img-grid" id="edit-img-grid"></div>
       <input type="file" id="edit-img-input" accept="image/*" multiple style="display:none" onchange="handleEditImages(this)">
-      <button class="attach-btn" style="margin-top:6px;" onclick="document.getElementById('edit-img-input').click()">🖼 이미지 추가</button>
+      <button class="attach-btn" style="margin-top:6px;" onclick="document.getElementById('edit-img-input').click()">이미지 추가</button>
     </div>`;
   renderEditImgGrid();
   document.getElementById('qm-body').querySelectorAll('textarea').forEach(t => { t.style.height='auto'; t.style.height=t.scrollHeight+'px'; });
@@ -770,22 +789,50 @@ function editQaItem(id) {
     <button class="modal-btn primary" onclick="saveQaEdit('${id}')">저장</button>`;
 }
 
+function setEditType(type) {
+  document.getElementById('edit-type-qa').className = 'modal-btn ' + (type==='qa'?'primary':'secondary');
+  document.getElementById('edit-type-notice').className = 'modal-btn ' + (type==='notice'?'primary':'secondary');
+  const label = document.getElementById('edit-q-label');
+  if (label) label.textContent = type==='notice' ? '내용' : '질문';
+  const ansSection = document.getElementById('edit-answer-section');
+  if (ansSection) ansSection.style.display = type==='notice' ? 'none' : '';
+}
+
+function setEditCategory(cat) {
+  ['기획','개발','디자인'].forEach(c => {
+    const id = c==='기획'?'edit-cat-plan':c==='개발'?'edit-cat-dev':'edit-cat-design';
+    document.getElementById(id).className = 'modal-btn ' + (c===cat?'primary':'secondary');
+  });
+}
+
 async function saveQaEdit(id) {
   const q = document.getElementById('edit-q').value.trim();
   if (!q) return;
   const found = findQaItem(id);
   if (!found) return;
+  const isNotice = document.getElementById('edit-type-notice')?.classList.contains('primary');
+  const cat = document.getElementById('edit-cat-plan')?.classList.contains('primary') ? '기획'
+    : document.getElementById('edit-cat-dev')?.classList.contains('primary') ? '개발' : '디자인';
   const origAnswers = found.item.answers && found.item.answers.length ? found.item.answers : [{text: found.item.a||''}];
-  const newAnswers = origAnswers.map((ans, i) => {
+  const newAnswers = isNotice ? [] : origAnswers.map((ans, i) => {
     const el = document.getElementById(`edit-a-${i}`);
     return el ? {...ans, text: el.value.trim()} : ans;
   }).filter(ans => ans.text);
-  const {error} = await sb.from('qa_items').update({question:q, answers:newAnswers, answer:newAnswers.length?newAnswers[newAnswers.length-1].text:null, images:editImages}).eq('id', id);
+  const {error} = await sb.from('qa_items').update({
+    question: q,
+    answers: newAnswers,
+    answer: newAnswers.length ? newAnswers[newAnswers.length-1].text : null,
+    images: editImages,
+    tags: [cat],
+    item_type: isNotice ? 'notice' : 'qa',
+  }).eq('id', id);
   if (error) { alert('저장 실패: ' + error.message); return; }
   found.item.q = q;
   found.item.answers = newAnswers;
   found.item.a = newAnswers.length ? newAnswers[0].text : '';
   found.item.images = editImages.slice();
+  found.item.tags = [cat];
+  found.item.itemType = isNotice ? 'notice' : 'qa';
   showDetail(id);
   renderQaList(currentQaTab);
 }
