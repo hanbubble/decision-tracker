@@ -711,14 +711,22 @@ function showDetail(id) {
       <div class="mf-label">${d.itemType==='notice' ? '내용' : '질문'}</div>
       <div style="font-size:16px;color:var(--text);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">${nl2br(d.q)}${renderImgGrid(d.images)}</div>
     </div>
-    ${d.itemType!=='notice' ? `
+    ${d.itemType==='notice' ? `
+    <div>
+      <div class="mf-label">코멘트 ${d.answers&&d.answers.length>0?`(${d.answers.length}개)`:''}</div>
+      ${d.answers&&d.answers.length
+        ? d.answers.map((ans,i)=>`<div style="margin-bottom:6px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">${d.answers.length>1?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px;">코멘트 ${i+1}</div>`:''}
+          <div style="font-size:15px;color:var(--text2);line-height:1.6;">${nl2br(ans.text)}</div></div>`).join('')
+        : ''}
+      <textarea id="notice-comment-input" class="mf-input mf-textarea" style="min-height:60px;margin-top:4px;" placeholder="코멘트를 입력하세요..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+    </div>` : `
     <div>
       <div class="mf-label">답변 ${d.answers&&d.answers.length>1?`(${d.answers.length}개)`:''}</div>
       ${d.answers&&d.answers.length
         ? d.answers.map((ans,i)=>`<div style="margin-bottom:6px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">${d.answers.length>1?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px;">답변 ${i+1}</div>`:''}
           <div style="font-size:15px;color:var(--text2);line-height:1.6;">${nl2br(ans.text)}</div></div>`).join('')
         : `<div style="font-size:15px;color:var(--text3);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;min-height:60px;">아직 답변이 없습니다.</div>`}
-    </div>` : ''}
+    </div>`}
     <div>
       <div class="mf-label">화면 이동</div>
       <div style="display:flex;gap:6px;">
@@ -729,9 +737,11 @@ function showDetail(id) {
 
   document.getElementById('qm-footer').innerHTML = `
     <button class="modal-btn secondary" onclick="deleteQaItem('${id}')" style="color:var(--red);border-color:rgba(248,113,113,0.4);margin-right:auto;">삭제</button>
-    ${d.itemType!=='notice' ? `<button class="modal-btn secondary" onclick="toggleQaStatus('${id}')">${d.status==='resolved'?'↩ 미해결':'✓ 해결됨'}</button>` : ''}
+    ${d.itemType==='notice'
+      ? `<button class="modal-btn primary" onclick="addNoticeComment('${id}')">코멘트 달기</button>`
+      : `<button class="modal-btn secondary" onclick="toggleQaStatus('${id}')">${d.status==='resolved'?'↩ 미해결':'✓ 해결됨'}</button>`}
     <button class="modal-btn secondary" onclick="editQaItem('${id}')">수정</button>
-    <button class="modal-btn primary" onclick="closeDetail()">닫기</button>`;
+    <button class="modal-btn secondary" onclick="closeDetail()">닫기</button>`;
 
   document.getElementById('qa-modal').classList.add('open');
   renderQaList(currentQaTab);
@@ -882,6 +892,18 @@ async function toggleQaStatus(id) {
   found.item.status = newStatus;
   showDetail(id);
   renderQaList(currentQaTab);
+}
+
+async function addNoticeComment(id) {
+  const text = document.getElementById('notice-comment-input')?.value.trim();
+  if (!text) return;
+  const found = findQaItem(id);
+  if (!found) return;
+  const newAnswers = [...(found.item.answers || []), { text, author: null, created_at: new Date().toISOString() }];
+  const { error } = await sb.from('qa_items').update({ answers: newAnswers }).eq('id', id);
+  if (error) { alert('저장 실패: ' + error.message); return; }
+  found.item.answers = newAnswers;
+  showDetail(id);
 }
 
 function closeDetail() { activeQaCard=null; document.getElementById('qa-modal').classList.remove('open'); renderQaList(currentQaTab); }
