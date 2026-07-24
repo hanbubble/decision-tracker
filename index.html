@@ -504,6 +504,13 @@ function buildIndex() {
     (s.decisions||[]).forEach(d => items.push({type:'decision',screenKey:key,title:d.q,body:d.why,sub:s.name+' · 결정사항'}));
     (s.kpis||[]).forEach(k => items.push({type:'screen',screenKey:key,title:k.name,body:k.value+' '+k.trend,sub:s.name+' · KPI'}));
     (s.decisions||[]).forEach(d => { if (d.reconsider) items.push({type:'screen',screenKey:key,title:d.reconsider,body:'',sub:s.name+' · 재논의조건'}); });
+    (s.specRows||[]).forEach((row, index) => items.push({
+      type:'spec',
+      screenKey:key,
+      title:row.title || `기능명세서 ${index + 1}`,
+      body:row.body || '',
+      sub:s.name+' · 기능명세서'
+    }));
   });
   Object.entries(qaData).forEach(([key, qas]) => {
     qas.forEach(q => items.push({type:'qa',screenKey:key,qaId:q.id,title:q.q,body:q.a||'',status:q.status,source:q.source,sub:screens[key]?.name+' · Q&A'}));
@@ -511,6 +518,73 @@ function buildIndex() {
   return items;
 }
 let searchIndex = [];
+let specSearchRequestId = 0;
+
+function specTableToRows(table) {
+  if (!table) return [];
+  const labels = (table.cols||[]).map(col => String(col?.label||'').trim());
+  return (table.rows||[]).map((row, rowIndex) => {
+    const values = (row.c||[]).map(cell => String(cell?.f ?? cell?.v ?? '').trim());
+    if (!values.some(Boolean)) return null;
+    const firstValueIndex = values.findIndex(Boolean);
+    const title = values[firstValueIndex] || `기능명세서 ${rowIndex + 1}`;
+    const bodyParts = values.map((value, i) => {
+      if (!value || i === firstValueIndex) return '';
+      return labels[i] ? `${labels[i]}: ${value}` : value;
+    }).filter(Boolean);
+    return {title, body:bodyParts.join(' · ')};
+  }).filter(Boolean);
+}
+
+function setSpecSearchRows(screenKey, table) {
+  if (!screenKey || !screens[screenKey]) return;
+  screens[screenKey].specRows = specTableToRows(table);
+  searchIndex = buildIndex();
+}
+
+function parseSpecUrl(specUrl) {
+  const rangeSep = specUrl.indexOf('#range=');
+  const url = rangeSep === -1 ? specUrl : specUrl.slice(0, rangeSep);
+  const range = rangeSep === -1 ? '' : specUrl.slice(rangeSep + 7);
+  const sheetMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
+  return {sheetId:sheetMatch?.[1]||'', gid:gidMatch?.[1]||'', range};
+}
+
+function fetchSpecSearchRows(screenKey, specUrl) {
+  const {sheetId, gid, range} = parseSpecUrl(specUrl||'');
+  if (!sheetId) {
+    if (screens[screenKey]) screens[screenKey].specRows = [];
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    const requestId = ++specSearchRequestId;
+    const callbackName = `__specSearchGviz${requestId}`;
+    const script = document.createElement('script');
+    let finished = false;
+    const finish = table => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      script.remove();
+      delete window[callbackName];
+      if (table) setSpecSearchRows(screenKey, table);
+      resolve();
+    };
+    window[callbackName] = data => finish(data?.table);
+    script.onerror = () => finish(null);
+    script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${callbackName}&headers=0${gid?'&gid='+gid:''}${range?'&range='+encodeURIComponent(range):''}`;
+    const timer = setTimeout(() => finish(null), 10000);
+    document.head.appendChild(script);
+  });
+}
+
+async function hydrateSpecSearchIndex() {
+  await Promise.all(Object.entries(screens)
+    .filter(([, screen]) => screen.specUrl)
+    .map(([key, screen]) => fetchSpecSearchRows(key, screen.specUrl)));
+  searchIndex = buildIndex();
+}
 
 let searchMode='keyword', searchTimer=null, currentScreen=null, currentRpTab='info', currentQaTab='all', activeQaCard=null, specOpen=false, aiController=null;
 let editImages=[];
@@ -587,7 +661,7 @@ function renderResults(results, query, aiSummary, thinking) {
   if (!results.length) { html += `<div class="sd-empty">관련 결과를 찾지 못했어요</div>`; }
   else {
     const infoItems = results.filter(r=>r.type!=='qa'), qaItems = results.filter(r=>r.type==='qa');
-    if (infoItems.length) { html += `<div class="sd-section-label">화면 정보</div>`; infoItems.forEach(item => { html += `<div class="sd-item" onclick="navigateTo('${item.screenKey}','info')"><div class="sd-item-icon screen">◉</div><div class="sd-item-body"><div class="sd-item-title">${hl(item.title,query)}</div>${item.body?`<div class="sd-item-sub">${hl(item.body,query)}</div>`:''}<div class="sd-item-meta"><span class="sd-badge ${item.type==='decision'?'decision':'screen'}">${item.type==='decision'?'결정사항':item.sub.includes('KPI')?'KPI':item.sub.includes('재논의')?'재논의':'화면정보'}</span><span class="sd-score">${item.sub}</span>${item.aiReason?`<span class="sd-badge ai">${item.aiReason}</span>`:''}</div></div>${item.score?`<div class="sd-relevance"><div class="sd-relevance-bar" style="width:${item.score}%"></div></div>`:''}</div>`; }); }
+    if (infoItems.length) { html += `<div class="sd-section-label">화면 정보</div>`; infoItems.forEach(item => { html += `<div class="sd-item" onclick="navigateTo('${item.screenKey}','${item.type==='spec'?'spec':'info'}')"><div class="sd-item-icon screen">◉</div><div class="sd-item-body"><div class="sd-item-title">${hl(item.title,query)}</div>${item.body?`<div class="sd-item-sub">${hl(item.body,query)}</div>`:''}<div class="sd-item-meta"><span class="sd-badge ${item.type==='decision'?'decision':'screen'}">${item.type==='decision'?'결정사항':item.type==='spec'?'기능명세서':item.sub.includes('KPI')?'KPI':item.sub.includes('재논의')?'재논의':'화면정보'}</span><span class="sd-score">${item.sub}</span>${item.aiReason?`<span class="sd-badge ai">${item.aiReason}</span>`:''}</div></div>${item.score?`<div class="sd-relevance"><div class="sd-relevance-bar" style="width:${item.score}%"></div></div>`:''}</div>`; }); }
     if (qaItems.length) { if (infoItems.length) html+=`<div class="sd-divider"></div>`; html += `<div class="sd-section-label">Q&A</div>`; qaItems.forEach(item => { html += `<div class="sd-item" onclick="navigateTo('${item.screenKey}','qa',${item.qaId})"><div class="sd-item-icon qa ${item.status}">${item.status==='resolved'?'✓':'!'}</div><div class="sd-item-body"><div class="sd-item-title">${hl(item.title,query)}</div>${item.body?`<div class="sd-item-sub">${hl(item.body,query)}</div>`:''}<div class="sd-item-meta"><span class="sd-badge ${item.status==='resolved'?'qa-resolved':'qa'}">${item.status==='resolved'?'해결됨':'미해결'}</span><span class="sd-score">${item.sub}</span>${item.aiReason?`<span class="sd-badge ai">${item.aiReason}</span>`:''}</div></div>${item.score?`<div class="sd-relevance"><div class="sd-relevance-bar" style="width:${item.score}%"></div></div>`:''}</div>`; }); }
   }
   dd.innerHTML = html;
@@ -597,7 +671,13 @@ function navigateTo(screenKey, tab, qaId) {
   closeDropdown(); document.getElementById('search-input').value='';
   currentScreen=screenKey; document.getElementById('screen-badge').textContent=screens[screenKey]?.name||'';
   renderSidebarScreens();
-  renderScreenInfo(screenKey); renderQaList(currentQaTab); switchRpTab(tab);
+  renderScreenInfo(screenKey); renderQaList(currentQaTab); loadScreenLinks(screenKey);
+  if (tab === 'spec') {
+    switchRpTab('info');
+    if (!specOpen) toggleSpec();
+  } else {
+    switchRpTab(tab);
+  }
   if (qaId) setTimeout(()=>showDetail(qaId),100);
 }
 
@@ -1002,6 +1082,7 @@ function openFigma() { const u=document.getElementById('figma-url').value.trim()
 function loadSpec(save=true) {
   const u=document.getElementById('spec-url').value.trim(); if(!u) return;
   const range=document.getElementById('spec-range').value.trim();
+  const targetScreen=currentScreen;
   const sheetMatch=u.match(/\/d\/([a-zA-Z0-9_-]+)/);
   const gidMatch=u.match(/[?&#]gid=([0-9]+)/);
   document.getElementById('spec-empty').style.display='none';
@@ -1017,6 +1098,7 @@ function loadSpec(save=true) {
       if(!data||!data.table){el.innerHTML='<p style="color:var(--text3)">데이터를 불러올 수 없어요. 시트 공유 설정을 확인하세요.</p>';return;}
       const cols=data.table.cols||[];
       const rows=data.table.rows||[];
+      setSpecSearchRows(targetScreen, data.table);
       const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
       const hasColLabels=cols.some(c=>c.label);
       let html='<table class="spec-table">';
@@ -1043,6 +1125,7 @@ function loadSpec(save=true) {
   if(save && currentScreen && currentScreen!=='__unassigned__') {
     const saveVal = u + (range ? '#range='+range : '');
     screens[currentScreen].specUrl=saveVal;
+    fetchSpecSearchRows(currentScreen, saveVal);
     const lk=JSON.parse(localStorage.getItem('screenLinks')||'{}');
     if(!lk[currentScreen]) lk[currentScreen]={};
     lk[currentScreen].specUrl=saveVal;
@@ -1344,7 +1427,7 @@ async function init() {
   const {data:sData, error:sErr} = await sb.from('screens').select('*').order('sort_order').order('created_at');
   if (sErr) console.error('screens 로드 실패:', sErr);
   (sData||[]).forEach(row => {
-    screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[], figmaUrl:row.figma_url||'', specUrl:row.spec_url||''};
+    screens[row.id] = {name:row.name, purpose:row.purpose||'', kpis:row.kpis||[], decisions:row.decisions||[], figmaFrames:row.figma_frames||[], owners:row.owners||[], history:row.history||[], figmaUrl:row.figma_url||'', specUrl:row.spec_url||'', specRows:[]};
     screenOrder.push(row.id);
   });
   const {data:qData, error:qErr} = await sb.from('qa_items').select('*').order('created_at', {ascending:false});
@@ -1356,6 +1439,7 @@ async function init() {
     qaData[k].push({id:row.id, q:row.question, answers:ans, a:ans.length?ans[0].text:'', status:row.status, tags:row.tags||[], source:row.source, sourceUrl:row.source_url||'', time:formatTime(row.created_at), itemType:row.item_type||'qa', images:row.images||[]});
   });
   searchIndex = buildIndex();
+  hydrateSpecSearchIndex();
   sb.channel('realtime-qa')
     .on('postgres_changes', {event:'INSERT', schema:'public', table:'qa_items'}, payload => {
       const row = payload.new;
